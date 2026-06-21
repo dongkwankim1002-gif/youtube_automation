@@ -70,6 +70,40 @@ SFX_URLS = {
 }
 
 
+SKIN_CONFIGS = {
+    "🎬 역사 다큐멘터리 (Historical Documentary)": {
+        "persona": "넷플릭스 역사 다큐멘터리 전문 감독이자 연출가",
+        "narration_style": "웅장하고 신뢰감 넘치는 구어체 존댓말, 역사적 무게감과 깊이가 느껴지는 다큐멘터리 전문 성우 톤",
+        "visual_style": "초고화질 극실사 영화 스틸컷, 극적인 조명과 그림자, 사실적인 디테일, 역사적 고증 준수",
+        "recommended_bgm": "dark_mystery"
+    },
+    "💡 동기부여 & 자기계발 (Motivation & Self-Development)": {
+        "persona": "사람들에게 깊은 영감을 주는 라이프 코치이자 동기부여 강연가",
+        "narration_style": "짧고 강력한 단문 형태, 청중을 집중시키는 힘차고 자신감 넘치는 강한 어조, 직접 질문을 던지는 호소력 있는 말투",
+        "visual_style": "에너제틱하고 현대적인 비주얼, 밝은 조명 대비, 극적인 야외 전경 및 목표를 향해 나아가는 인물의 역동적인 클로즈업",
+        "recommended_bgm": "epic_orchestral"
+    },
+    "🔬 과학 & 일반 상식 (Science & Trivia)": {
+        "persona": "지식을 흥미롭고 위트 있게 설명해 주는 전문 과학 유튜버",
+        "narration_style": "호기심을 유발하고 유용한 지식을 또박또박 설명해 주는 톤, 대중적이고 친근하며 흥미를 주는 설명조",
+        "visual_style": "깔끔하고 세련된 3D 그래픽 느낌, 과학적 구조나 인포그래픽 요소가 살짝 결합된 정돈되고 밝은 이미지",
+        "recommended_bgm": "intense_suspense"
+    },
+    "📖 소설 & 판타지 스토리텔링 (Fiction & Storytelling)": {
+        "persona": "감성적이고 따뜻하며 흥미진진한 판타지 소설 작가",
+        "narration_style": "한 편의 동화나 소설책을 낭독해 주듯 감정이 풍부하고 부드러운 목소리, 청중이 스토리에 완전 몰입할 수 있는 연극적 톤",
+        "visual_style": "환상적이고 몽환적인 판타지 아트 스타일, 따뜻하고 부드러운 파스텔톤 빛과 색채, 감성적인 일러스트레이션 풍",
+        "recommended_bgm": "sad_piano"
+    },
+    "👻 공포 & 미스터리 극장 (Horror & Mystery)": {
+        "persona": "기묘한 미스터리와 오싹한 괴담을 이야기하는 어둠 속의 스토리텔러",
+        "narration_style": "낮고 음산하게 읊조리는 톤, 긴장감을 극대화하는 서늘한 어조, 느릿한 호흡과 나지막이 속삭이는 듯한 오싹한 화법",
+        "visual_style": "어둡고 기괴한 고딕 스타일, 짙은 안개와 극적인 실루엣, 창백한 조명 대비, 스릴러 영화의 공포스러운 분위기",
+        "recommended_bgm": "dark_mystery"
+    }
+}
+
+
 def download_audio_asset(url, output_path):
     """Download a file from url and save to output_path if not already exists."""
     if os.path.exists(output_path):
@@ -260,7 +294,7 @@ def generate_voice_over(text, output_path, provider="edge", voice_id=None, api_k
     return "edge"
 
 
-def generate_script_from_gemini(topic, is_shorts=True, character_desc="", visual_style=""):
+def generate_script_from_gemini(topic, is_shorts=True, character_desc="", visual_style="", content_skin="🎬 역사 다큐멘터리 (Historical Documentary)"):
     """Use Gemini 2.5 Pro to structure a high-fidelity cinematic script containing visual, camera, BGM, and SFX directives."""
     from google import genai
     
@@ -274,6 +308,13 @@ def generate_script_from_gemini(topic, is_shorts=True, character_desc="", visual
     duration_guide = "1분 이내 (쇼츠 포맷, 씬 4~5개 분량)" if is_shorts else "5분 내외 (일반 영상 포맷, 씬 10~15개 분량)"
     layout_guide = "세로형 (9:16)" if is_shorts else "가로형 (16:9)"
     
+    # Retrieve configuration for selected skin
+    skin_info = SKIN_CONFIGS.get(content_skin, SKIN_CONFIGS["🎬 역사 다큐멘터리 (Historical Documentary)"])
+    persona = skin_info["persona"]
+    narration_style = skin_info["narration_style"]
+    recommended_visual = skin_info["visual_style"]
+    recommended_bgm = skin_info["recommended_bgm"]
+    
     consistency_guide = ""
     if character_desc:
         consistency_guide += f"\n- 주요 등장인물 묘사: {character_desc}\n  (중요: 캐릭터가 등장하는 모든 씬의 'visual_prompt'에는 해당 인물의 이름과 함께 위 묘사의 세부 외모 특징들을 반드시 구체적으로 기술하여 이미지 모델이 일관된 외모로 그리도록 하십시오.)"
@@ -281,23 +322,24 @@ def generate_script_from_gemini(topic, is_shorts=True, character_desc="", visual
         consistency_guide += f"\n- 비주얼 화풍 및 아트 스타일: {visual_style}\n  (중요: 모든 씬의 'visual_prompt'는 이 비주얼 화풍 가이드라인을 반영하여 통일성 있게 묘사해 주십시오.)"
     
     prompt = f"""
-    당신은 넷플릭스 역사 다큐멘터리 전문 감독이자 연출가입니다.
+    당신은 {persona}입니다.
     주제: "{topic}"에 대해 시청자가 숨을 죽이고 몰입할 수 있는 최고의 시네마틱 비디오 시나리오를 설계해 주세요.
     분량 가이드: {duration_guide}
     영상 비율: {layout_guide}
+    기본 비주얼 연출 스타일: {recommended_visual}
     {consistency_guide}
 
     반드시 아래 JSON 형식으로만 응답하세요. 다른 설명이나 텍스트는 일체 생략하고 순수 JSON 데이터만 반환해야 합니다.
 
     {{
-      "title": "영화 예고편처럼 시청자의 시선을 강탈하는 제목 (클릭률 극대화)",
-      "description": "역사 다큐멘터리 요약본 및 관련 핵심 해시태그",
+      "title": "시청자의 시선을 강탈하는 제목 (클릭률 극대화)",
+      "description": "동영상 요약본 및 관련 핵심 해시태그",
       "tags": ["태그1", "태그2", "태그3", "태그4"],
-      "overall_bgm_mood": "전체 영상의 BGM 분위기 (예: 'epic_orchestral', 'dark_mystery', 'sad_piano', 'intense_suspense' 중 택1)",
+      "overall_bgm_mood": "전체 영상의 BGM 분위기 (예: '{recommended_bgm}'을 추천하지만, 상황에 맞게 'epic_orchestral', 'dark_mystery', 'sad_piano', 'intense_suspense' 중 택1)",
       "scenes": [
         {{
-          "narration": "이 장면에 들어갈 한국어 나레이션 문장 (넷플릭스 다큐 전문 성우가 읊조리듯 웅장하고 신뢰감 넘치는 구어체 존댓말)",
-          "visual_prompt": "이 장면에 어울리는 영화 스틸컷 수준의 영어 이미지 생성 프롬프트 (Flux/DALL-E 3용, 예: 'A close-up cinematic shot of a worried King Sejong holding a candle, inspecting ancient Korean documents in a dark royal library, warm candle light casting deep shadows, historical costume, volumetric lighting, photorealistic, 8k resolution')",
+          "narration": "이 장면에 들어갈 한국어 나레이션 문장 ({narration_style})",
+          "visual_prompt": "이 장면에 어울리는 영어 이미지 생성 프롬프트 (Flux/DALL-E 3용, 주제에 맞고 {recommended_visual} 스타일이 살도록 구체적으로 묘사)",
           "camera_movement": {{
             "type": "zoom_in / zoom_out / pan_left / pan_right / pan_up / pan_down",
             "speed": "slow / medium"
@@ -645,7 +687,8 @@ def generate_full_video(topic, is_shorts=True, output_filename="final_output.mp4
                         tts_provider="edge", tts_voice_id=None, tts_api_key=None,
                         image_provider="pollinations", fal_key=None, openai_key=None,
                         pregenerated_script=None, target_size=None,
-                        character_desc="", visual_style=""):
+                        character_desc="", visual_style="",
+                        content_skin="🎬 역사 다큐멘터리 (Historical Documentary)"):
     """Entire video pipeline from scripting to final video composition with Ken Burns and ducked BGM."""
     print("[Start] Starting Cinematic AI Video Factory Pipeline...")
     
@@ -657,7 +700,7 @@ def generate_full_video(topic, is_shorts=True, output_filename="final_output.mp4
         script_data = pregenerated_script
         print("[Script] Using pre-generated script.")
     else:
-        script_data = generate_script_from_gemini(topic, is_shorts, character_desc, visual_style)
+        script_data = generate_script_from_gemini(topic, is_shorts, character_desc, visual_style, content_skin)
         print(f"[Script] Script Generated! Title: {script_data['title']}")
     
     # 2. Build individual scene video clips
