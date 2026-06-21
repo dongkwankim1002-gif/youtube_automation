@@ -946,7 +946,7 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
     composite_clip.fps = 24
     
     # Strip mask to prevent MoviePy mask concatenation bugs that cause black screens in subsequent clips
-    composite_clip = composite_clip.without_mask()
+    composite_clip.mask = None
     
     return composite_clip
 
