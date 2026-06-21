@@ -1,0 +1,22 @@
+# Virtual environment
+.venv/
+__pycache__/
+*.pyc
+
+# Sensitive configuration files (MUST NOT BE UPLOADED)
+.env
+client_secrets.json
+oauth_credentials.json
+
+# Local temp assets & rendered media
+temp_assets/
+audio_assets/
+*.mp4
+*.png
+*.jpg
+*.jpeg
+*.mp3
+
+# IDE config
+.vscode/
+.idea/

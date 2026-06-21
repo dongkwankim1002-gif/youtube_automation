@@ -1,0 +1,13 @@
+streamlit
+edge-tts
+moviepy==1.0.3
+requests
+pillow
+python-dotenv
+google-api-python-client
+google-auth-oauthlib
+google-auth-httplib2
+anthropic
+google-generativeai
+google-genai
+openai
