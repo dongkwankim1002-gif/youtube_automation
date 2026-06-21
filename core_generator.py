@@ -14,16 +14,16 @@ if not hasattr(Image, 'ANTIALIAS'):
     Image.ANTIALIAS = Image.Resampling.LANCZOS
 
 # Monkey patch for Windows console encoding (cp949) issues with emojis
-if sys.stdout.encoding != 'utf-8':
-    try:
+try:
+    if sys.stdout and getattr(sys.stdout, 'encoding', 'utf-8') != 'utf-8':
         sys.stdout.reconfigure(errors='replace')
-    except Exception:
-        pass
-if sys.stderr.encoding != 'utf-8':
-    try:
+except Exception:
+    pass
+try:
+    if sys.stderr and getattr(sys.stderr, 'encoding', 'utf-8') != 'utf-8':
         sys.stderr.reconfigure(errors='replace')
-    except Exception:
-        pass
+except Exception:
+    pass
 from moviepy.editor import (
     AudioFileClip,
     ImageClip,
