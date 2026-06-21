@@ -72,6 +72,12 @@ st.markdown("""
 # Force load environment variables
 load_dotenv()
 
+# Force reload core_generator to bypass Streamlit Community Cloud module caching
+import importlib
+import core_generator
+importlib.reload(core_generator)
+
+
 def cleanup_old_files(max_age_seconds=600):
     """Scan root directory and clean up dynamic output render/thumbnail files older than 10 minutes."""
     import time
