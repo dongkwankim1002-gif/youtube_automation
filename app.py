@@ -80,6 +80,10 @@ if has_valid_gemini:
 else:
     st.sidebar.warning("⚠️ 작동 가능한 Gemini API Key가 필요합니다")
 
+api_pexels = st.sidebar.text_input("Pexels API Key (스톡 비디오용)", value=pexels_key, type="password")
+if api_pexels:
+    os.environ["PEXELS_API_KEY"] = api_pexels
+
 st.sidebar.markdown("---")
 
 # 1. TTS Provider Configuration
@@ -167,8 +171,10 @@ else: # 1080p
 # State Management for outputs and wizard steps
 if "step" not in st.session_state:
     st.session_state.step = "input"
-if "content_skin" not in st.session_state:
-    st.session_state.content_skin = "🎬 역사 다큐멘터리 (Historical Documentary)"
+if "content_genre" not in st.session_state:
+    st.session_state.content_genre = "🎬 역사 다큐멘터리 (Historical Documentary)"
+if "video_skin" not in st.session_state:
+    st.session_state.video_skin = "Option 1: 스틸컷 & Ken Burns 연출 (AI Image + Ken Burns)"
 if "topic" not in st.session_state:
     st.session_state.topic = ""
 if "character_desc" not in st.session_state:
@@ -194,8 +200,27 @@ if st.session_state.step == "input":
     col1, col2 = st.columns([2, 1.2])
     
     with col1:
-        # Skin selection at the very beginning
-        skin_presets = [
+        # 1. Technical Production Skin Selection
+        video_skins = [
+            "Option 1: 스틸컷 & Ken Burns 연출 (AI Image + Ken Burns)",
+            "Option 2: AI 비디오 직접 생성 (AI Video Generation - Luma/Kling)",
+            "Option 3: 스톡 비디오 매칭 (Stock Footage - Pexels API)",
+            "Option 4: AI 아바타 발표자 스타일 (AI Talking Avatar Presenter)",
+            "Option 5: 타이포그래피 & 자막 포커스 (Minimalist Typography)"
+        ]
+        
+        selected_video_skin = st.selectbox(
+            "동영상 기술 제작방식(스킨) 선택",
+            video_skins,
+            index=video_skins.index(st.session_state.video_skin),
+            help="영상의 시각적인 최종 프레임들을 합성하고 렌더링하는 핵심 기술 메커니즘을 지정합니다."
+        )
+        if selected_video_skin != st.session_state.video_skin:
+            st.session_state.video_skin = selected_video_skin
+            st.rerun()
+
+        # 2. Content Genre Selection
+        genre_presets = [
             "🎬 역사 다큐멘터리 (Historical Documentary)",
             "💡 동기부여 & 자기계발 (Motivation & Self-Development)",
             "🔬 과학 & 일반 상식 (Science & Trivia)",
@@ -203,19 +228,19 @@ if st.session_state.step == "input":
             "👻 공포 & 미스터리 극장 (Horror & Mystery)"
         ]
         
-        selected_skin = st.selectbox(
-            "콘텐츠 제작 스킨(제작 방식) 선택",
-            skin_presets,
-            index=skin_presets.index(st.session_state.content_skin),
-            help="각 제작 스킨은 최적의 나레이터 말투, 음악 연출, 이미지 생성 화풍 사전을 포함하고 있습니다."
+        selected_genre = st.selectbox(
+            "콘텐츠 장르 & 테마 카테고리 선택",
+            genre_presets,
+            index=genre_presets.index(st.session_state.content_genre),
+            help="선택한 장르 카테고리는 대본 성우 말투, 어조, BGM 무드 등 기획과 내용 구성을 규정합니다."
         )
         
-        # When skin changes, update recommended defaults in session state
-        if selected_skin != st.session_state.content_skin:
-            st.session_state.content_skin = selected_skin
-            if selected_skin == "🔬 과학 & 일반 상식 (Science & Trivia)":
+        # When genre changes, update recommended defaults in session state
+        if selected_genre != st.session_state.content_genre:
+            st.session_state.content_genre = selected_genre
+            if selected_genre == "🔬 과학 & 일반 상식 (Science & Trivia)":
                 st.session_state.visual_style = "3D 애니메이션 스타일 (Pixar-style 3D Render)"
-            elif selected_skin == "📖 소설 & 판타지 스토리텔링 (Fiction & Storytelling)":
+            elif selected_genre == "📖 소설 & 판타지 스토리텔링 (Fiction & Storytelling)":
                 st.session_state.visual_style = "역사화 유화 스타일 (Historical Oil Painting)"
             else:
                 st.session_state.visual_style = "시네마틱 실사 영화 스틸컷 (Dramatic Cinematic Shot)"
@@ -283,7 +308,7 @@ if st.session_state.step == "input":
                             is_shorts=is_shorts,
                             character_desc=char_desc_input,
                             visual_style=style_desc_input,
-                            content_skin=st.session_state.content_skin
+                            content_skin=st.session_state.content_genre
                         )
                         st.session_state.script_data = script_data
                         st.session_state.topic = topic_input
@@ -298,9 +323,9 @@ if st.session_state.step == "input":
     with col2:
         st.markdown("#### 💡 팁 & 활용 가이드")
         st.info(f"""
-        - **선택된 스킨**: `{st.session_state.content_skin}`
-        - **스킨의 특징**: 선택하신 스킨은 백엔드 기획 및 대본 설계 시 연출가 페르소나, 특유의 대본 어투, 추천 음원 분위기를 자동 적용합니다.
-        - **일관성**: 특정 인물의 외모 특징을 기재하면 AI 이미지 모델이 매 장면 동일한 얼굴로 묘사하도록 시각 프롬프트를 보강합니다.
+        - **동영상 기술 스킨**: `{st.session_state.video_skin}`
+        - **장르 및 테마**: `{st.session_state.content_genre}`
+        - 스킨은 렌더링 시 AI 이미지 무빙, AI 비디오 클립 생성, 실사 스톡 비디오 매칭, 가상 아바타 또는 타이포그래피 등 최종 시각 결과물을 만들어내는 **핵심 기술 엔진**을 의미합니다.
         """)
 
 # ----------------- PHASE 2: EDIT STEP -----------------
@@ -462,8 +487,8 @@ elif st.session_state.step == "render":
             # Use settings from sidebar
             output_filename = "final_output.mp4"
             
-            status.write("⚙️ 1단계: 성우 나레이션 및 AI 이미지 생성, 효과음 믹싱 중...")
-            status.write("💾 2단계: MoviePy 비디오 렌더링 시작 (Ken Burns 카메라 무빙 및 BGM Ducking 적용)...")
+            status.write("⚙️ 1단계: 성우 나레이션 및 비주얼 클립 검색/생성 중...")
+            status.write("💾 2단계: MoviePy 비디오 렌더링 시작 (선택된 기술 스킨 및 BGM Ducking 적용)...")
             
             video_path, script_data = core_generator.generate_full_video(
                 st.session_state.topic, 
@@ -477,7 +502,9 @@ elif st.session_state.step == "render":
                 openai_key=openai_api_key if openai_api_key else openai_key,
                 pregenerated_script=st.session_state.script_data,
                 target_size=target_size,
-                content_skin=st.session_state.content_skin
+                content_skin=st.session_state.content_genre,
+                video_skin=st.session_state.video_skin,
+                pexels_key=api_pexels if api_pexels else pexels_key
             )
             
             # Copy final output to keep a stable file name

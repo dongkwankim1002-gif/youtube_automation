@@ -180,8 +180,8 @@ def wrap_text(text, font, max_width, draw):
     return lines
 
 
-def create_subtitle_image(text, width=1080, height=1920, font_size=48, output_path="subtitle.png"):
-    """Create a transparent PNG containing styled Korean subtitle text at the bottom."""
+def create_subtitle_image(text, width=1080, height=1920, font_size=48, output_path="subtitle.png", position="bottom"):
+    """Create a transparent PNG containing styled Korean subtitle text at the bottom or center."""
     # Create transparent image
     image = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
@@ -204,8 +204,11 @@ def create_subtitle_image(text, width=1080, height=1920, font_size=48, output_pa
             
     total_text_height = sum(line_heights) + (15 * (len(lines) - 1))  # 15px line spacing
     
-    # Subtitle position (bottom 20% area of the video)
-    start_y = int(height * 0.75) - (total_text_height // 2)
+    # Subtitle position
+    if position == "center":
+        start_y = int(height * 0.5) - (total_text_height // 2)
+    else: # bottom
+        start_y = int(height * 0.75) - (total_text_height // 2)
     
     current_y = start_y
     for i, line in enumerate(lines):
@@ -608,12 +611,159 @@ def make_ken_burns_clip(image_path, duration, target_size=(1080, 1920), movement
     return clip
 
 
+def fetch_pexels_stock_video(query, output_path, is_shorts=True, api_key=None):
+    """Search and download a stock video from Pexels API matching the query."""
+    if not api_key or api_key == "your_pexels_api_key_here" or api_key.strip() == "":
+        raise ValueError("Pexels API key is missing.")
+        
+    url = f"https://api.pexels.com/videos/search?query={urllib.parse.quote(query)}&per_page=5"
+    headers = {"Authorization": api_key}
+    
+    print(f"[Pexels] Searching stock video for query: {query}...")
+    response = requests.get(url, headers=headers, timeout=15)
+    if response.status_code != 200:
+        raise Exception(f"Pexels search failed: {response.status_code}, {response.text}")
+        
+    data = response.json()
+    videos = data.get("videos", [])
+    if not videos:
+        raise Exception(f"No stock videos found on Pexels for query: {query}")
+        
+    # Filter for matching aspect ratio if possible
+    selected_video_url = None
+    for video in videos:
+        video_files = video.get("video_files", [])
+        # Find a file with suitable resolution/aspect ratio
+        for vf in video_files:
+            width = vf.get("width") or 0
+            height = vf.get("height") or 0
+            file_type = vf.get("file_type", "")
+            if "mp4" in file_type:
+                # For shorts, prefer vertical
+                if is_shorts and height > width:
+                    selected_video_url = vf.get("link")
+                    break
+                # For normal, prefer landscape
+                elif not is_shorts and width > height:
+                    selected_video_url = vf.get("link")
+                    break
+        if selected_video_url:
+            break
+            
+    # Fallback to first video's first file if no aspect ratio match
+    if not selected_video_url and videos:
+        video_files = videos[0].get("video_files", [])
+        for vf in video_files:
+            if "mp4" in vf.get("file_type", ""):
+                selected_video_url = vf.get("link")
+                break
+                
+    if not selected_video_url:
+        raise Exception(f"No valid MP4 video files found for query: {query}")
+        
+    print(f"[Pexels] Downloading stock video: {selected_video_url[:60]}...")
+    v_resp = requests.get(selected_video_url, timeout=30)
+    if v_resp.status_code == 200:
+        with open(output_path, "wb") as f:
+            f.write(v_resp.content)
+        return True
+    else:
+        raise Exception(f"Failed to download video file: Status {v_resp.status_code}")
+
+
+def generate_fal_ai_video(prompt, output_path, is_shorts=True, api_key=None):
+    """Generate an AI video clip using Luma Dream Machine on Fal.ai."""
+    if not api_key or api_key == "your_fal_api_key_here" or api_key.strip() == "":
+        raise ValueError("Fal.ai API key is missing.")
+        
+    model_endpoint = "fal-ai/luma-dream-machine/t2v"
+    url = f"https://queue.fal.run/{model_endpoint}"
+    headers = {
+        "Authorization": f"Key {api_key}",
+        "Content-Type": "application/json"
+    }
+    
+    aspect_ratio = "9:16" if is_shorts else "16:9"
+    payload = {
+        "prompt": prompt,
+        "aspect_ratio": aspect_ratio
+    }
+    
+    print(f"[Fal.ai Video] Submitting video request for: {prompt[:40]}...")
+    response = requests.post(url, headers=headers, json=payload, timeout=20)
+    if response.status_code != 200:
+        raise Exception(f"Fal.ai Video submit failed with status {response.status_code}: {response.text}")
+        
+    data = response.json()
+    status_url = data.get("status_url")
+    if not status_url:
+        raise Exception(f"Fal.ai Video submit response did not return status_url: {data}")
+        
+    max_retries = 60
+    for i in range(max_retries):
+        status_resp = requests.get(status_url, headers=headers, timeout=10)
+        if status_resp.status_code != 200:
+            print(f"[Fal.ai Video Warning] Poll failed, retrying... Status: {status_resp.status_code}")
+            time.sleep(3)
+            continue
+            
+        status_data = status_resp.json()
+        status = status_data.get("status")
+        print(f"[Fal.ai Video] Polling... Status: {status}")
+        
+        if status == "COMPLETED":
+            video = status_data.get("video") or status_data.get("output", {}).get("video", {})
+            video_url = video.get("url")
+            if video_url:
+                print(f"[Fal.ai Video] Download link obtained: {video_url}")
+                vid_resp = requests.get(video_url, timeout=45)
+                if vid_resp.status_code == 200:
+                    with open(output_path, "wb") as f:
+                        f.write(vid_resp.content)
+                    return True
+                else:
+                    raise Exception(f"Failed to download video from URL: {video_url}")
+            else:
+                raise Exception(f"Fal.ai Video COMPLETED but no video url in output: {status_data}")
+        elif status in ["FAILED", "ERROR"]:
+            raise Exception(f"Fal.ai Video task failed: {status_data}")
+            
+        time.sleep(4)
+        
+    raise Exception("Fal.ai Video generation timed out after 240 seconds.")
+
+
+def make_circular_avatar(image_path, size=240):
+    """Crop an image into a circle with a premium border and return the path."""
+    img = Image.open(image_path).convert("RGBA")
+    img = img.resize((size, size), Image.Resampling.LANCZOS)
+    
+    # Create circular mask
+    mask = Image.new("L", (size, size), 0)
+    draw_mask = ImageDraw.Draw(mask)
+    draw_mask.ellipse((0, 0, size, size), fill=255)
+    
+    # Apply mask to image
+    output = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    output.paste(img, (0, 0), mask=mask)
+    
+    # Draw premium red border
+    draw_out = ImageDraw.Draw(output)
+    border_w = 6
+    draw_out.ellipse((border_w//2, border_w//2, size - border_w//2, size - border_w//2), outline=(255, 75, 75, 255), width=border_w)
+    
+    out_path = image_path.replace(".jpg", "_avatar.png")
+    output.save(out_path, "PNG")
+    return out_path
+
+
 def build_scene_video(scene_idx, scene_data, is_shorts=True, 
                       tts_provider="edge", tts_voice_id=None, tts_api_key=None,
                       image_provider="pollinations", fal_key=None, openai_key=None,
-                      target_size=None):
-    """Render a single scene: merges narration audio, visuals with Ken Burns effect, subtitles, and SFX."""
-    print(f"[Scene {scene_idx}] Rendering cinematic scene...")
+                      target_size=None, video_skin="Option 1: 스틸컷 & Ken Burns 연출 (AI Image + Ken Burns)",
+                      pexels_key=None, topic=""):
+    """Render a single scene: merges narration audio, visuals based on selected technical skin, subtitles, and SFX."""
+    print(f"[Scene {scene_idx}] Rendering scene with skin: {video_skin}...")
     
     audio_path = os.path.join(TEMP_DIR, f"audio_{scene_idx}.mp3")
     img_path = os.path.join(TEMP_DIR, f"visual_{scene_idx}.jpg")
@@ -627,27 +777,103 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
     # Add 1.5 seconds breather at the end of the scene for cinematic pacing
     scene_duration = narr_duration + 1.5
     
-    # 2. Get visuals using high-quality generator
-    prompt = scene_data.get("visual_prompt", "A dramatic cinematic historical scene")
-    generate_cinematic_image(prompt, img_path, is_shorts=is_shorts, provider=image_provider, fal_key=fal_key, openai_key=openai_key)
-    
-    # Apply Ken Burns camera effect
-    cam_info = scene_data.get("camera_movement", {})
-    cam_type = cam_info.get("type", "zoom_in")
-    cam_speed = cam_info.get("speed", "slow")
-    
     if target_size is None:
         target_size = (1080, 1920) if is_shorts else (1920, 1080)
-        
-    visual_clip = make_ken_burns_clip(img_path, scene_duration, target_size=target_size, movement_type=cam_type, speed=cam_speed)
-    
-    # 3. Create Subtitle Overlay (matches original narration duration, but transparent during the breather)
     width, height = target_size
-    create_subtitle_image(scene_data["narration"], width, height, font_size=42, output_path=subtitle_path)
+    
+    # 2. Get visuals based on selected technical skin
+    visual_clip = None
+    
+    if "Option 2" in video_skin: # AI Video Generation
+        try:
+            video_clip_path = os.path.join(TEMP_DIR, f"video_{scene_idx}.mp4")
+            prompt = scene_data.get("visual_prompt", "A dramatic cinematic scene")
+            generate_fal_ai_video(prompt, video_clip_path, is_shorts=is_shorts, api_key=fal_key)
+            
+            raw_vid_clip = VideoFileClip(video_clip_path)
+            if raw_vid_clip.duration < scene_duration:
+                visual_clip = raw_vid_clip.loop(duration=scene_duration)
+            else:
+                visual_clip = raw_vid_clip.subclip(0, scene_duration)
+            visual_clip = visual_clip.resize(target_size)
+            print(f"[Scene {scene_idx}] Generated AI video clip successfully!")
+        except Exception as e:
+            print(f"[Scene {scene_idx} Warning] AI video generation failed: {e}. Falling back to Ken Burns image...")
+            visual_clip = None
+            
+    elif "Option 3" in video_skin: # Stock Video Matching
+        try:
+            video_clip_path = os.path.join(TEMP_DIR, f"stock_{scene_idx}.mp4")
+            prompt = scene_data.get("visual_prompt", "")
+            
+            # Form search query from prompt descriptors
+            search_query = topic if topic else "cinematic"
+            if prompt:
+                search_query = prompt.split(",")[0]
+                
+            fetch_pexels_stock_video(search_query, video_clip_path, is_shorts=is_shorts, api_key=pexels_key)
+            
+            raw_vid_clip = VideoFileClip(video_clip_path)
+            if raw_vid_clip.duration < scene_duration:
+                visual_clip = raw_vid_clip.loop(duration=scene_duration)
+            else:
+                visual_clip = raw_vid_clip.subclip(0, scene_duration)
+            visual_clip = visual_clip.resize(target_size)
+            print(f"[Scene {scene_idx}] Fetched stock video successfully!")
+        except Exception as e:
+            print(f"[Scene {scene_idx} Warning] Stock video search failed: {e}. Falling back to Ken Burns image...")
+            visual_clip = None
+            
+    elif "Option 5" in video_skin: # Typography (Abstract background)
+        # Generate abstract background image
+        bg_prompt = "Abstract elegant liquid gradient background, smooth dark colors, high resolution, minimalist"
+        generate_cinematic_image(bg_prompt, img_path, is_shorts=is_shorts, provider=image_provider, fal_key=fal_key, openai_key=openai_key)
+        visual_clip = make_ken_burns_clip(img_path, scene_duration, target_size=target_size, movement_type="zoom_in", speed="slow")
+        
+    # Default fallback / Option 1 / Option 4 background
+    if visual_clip is None:
+        prompt = scene_data.get("visual_prompt", "A dramatic cinematic scene")
+        generate_cinematic_image(prompt, img_path, is_shorts=is_shorts, provider=image_provider, fal_key=fal_key, openai_key=openai_key)
+        
+        cam_info = scene_data.get("camera_movement", {})
+        cam_type = cam_info.get("type", "zoom_in")
+        cam_speed = cam_info.get("speed", "slow")
+        visual_clip = make_ken_burns_clip(img_path, scene_duration, target_size=target_size, movement_type=cam_type, speed=cam_speed)
+        
+    # 3. Create Subtitle Overlay
+    # Option 5 places subtitle in center
+    sub_position = "center" if "Option 5" in video_skin else "bottom"
+    create_subtitle_image(scene_data["narration"], width, height, font_size=56 if sub_position == "center" else 42, output_path=subtitle_path, position=sub_position)
     sub_clip = ImageClip(subtitle_path).set_duration(narr_duration)
     
-    # Composite visual & subtitles
-    composite_clip = CompositeVideoClip([visual_clip, sub_clip.set_start(0)], size=target_size).set_duration(scene_duration)
+    # 4. Talking Avatar overlay (Option 4)
+    avatar_clip = None
+    if "Option 4" in video_skin:
+        try:
+            presenter_prompt = "A professional neat news presenter avatar, close-up portrait, polite expression, front view, studio background, realistic photorealistic, 8k resolution"
+            presenter_img_path = os.path.join(TEMP_DIR, f"presenter_{scene_idx}.jpg")
+            generate_cinematic_image(presenter_prompt, presenter_img_path, is_shorts=True, provider=image_provider, fal_key=fal_key, openai_key=openai_key)
+            
+            avatar_path = make_circular_avatar(presenter_img_path, size=260)
+            raw_avatar_clip = ImageClip(avatar_path).set_duration(scene_duration)
+            
+            if is_shorts:
+                avatar_pos = (width // 2 - 130, int(height * 0.72) - 320)
+            else:
+                avatar_pos = (width - 340, height - 340)
+                
+            avatar_clip = raw_avatar_clip.set_position(avatar_pos)
+            print(f"[Scene {scene_idx}] Overlayed talking avatar badge successfully!")
+        except Exception as e:
+            print(f"[Scene {scene_idx} Warning] Failed to generate avatar badge: {e}")
+            
+    # Composite all visual tracks
+    visual_tracks = [visual_clip]
+    if avatar_clip:
+        visual_tracks.append(avatar_clip)
+    visual_tracks.append(sub_clip.set_start(0))
+    
+    composite_clip = CompositeVideoClip(visual_tracks, size=target_size).set_duration(scene_duration)
     
     # 4. Sound Design (Narration + SFX mixing)
     scene_audio_tracks = [narr_clip.set_start(0)]
@@ -688,9 +914,11 @@ def generate_full_video(topic, is_shorts=True, output_filename="final_output.mp4
                         image_provider="pollinations", fal_key=None, openai_key=None,
                         pregenerated_script=None, target_size=None,
                         character_desc="", visual_style="",
-                        content_skin="🎬 역사 다큐멘터리 (Historical Documentary)"):
-    """Entire video pipeline from scripting to final video composition with Ken Burns and ducked BGM."""
-    print("[Start] Starting Cinematic AI Video Factory Pipeline...")
+                        content_skin="🎬 역사 다큐멘터리 (Historical Documentary)",
+                        video_skin="Option 1: 스틸컷 & Ken Burns 연출 (AI Image + Ken Burns)",
+                        pexels_key=None):
+    """Entire video pipeline from scripting to final video composition with chosen technical skin."""
+    print(f"[Start] Starting Cinematic AI Video Factory Pipeline with technical skin: {video_skin}...")
     
     # Ensure default sound libraries are ready
     prepare_default_audio_assets()
@@ -713,7 +941,8 @@ def generate_full_video(topic, is_shorts=True, output_filename="final_output.mp4
             i, scene, is_shorts=is_shorts,
             tts_provider=tts_provider, tts_voice_id=tts_voice_id, tts_api_key=tts_api_key,
             image_provider=image_provider, fal_key=fal_key, openai_key=openai_key,
-            target_size=target_size
+            target_size=target_size, video_skin=video_skin, pexels_key=pexels_key,
+            topic=topic
         )
         scene_clips.append(clip)
         
