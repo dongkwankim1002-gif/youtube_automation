@@ -608,6 +608,7 @@ def make_ken_burns_clip(image_path, duration, target_size=(1080, 1920), movement
         
     clip = VideoClip(make_frame, duration=duration)
     clip.size = target_size
+    clip.fps = 24
     return clip
 
 
@@ -905,6 +906,7 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
                 
     scene_audio = CompositeAudioClip(scene_audio_tracks)
     composite_clip = composite_clip.set_audio(scene_audio)
+    composite_clip.fps = 24
     
     return composite_clip
 
