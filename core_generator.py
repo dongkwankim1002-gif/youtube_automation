@@ -560,7 +560,8 @@ def make_ken_burns_clip(image_path, duration, target_size=(1080, 1920), movement
 
 def build_scene_video(scene_idx, scene_data, is_shorts=True, 
                       tts_provider="edge", tts_voice_id=None, tts_api_key=None,
-                      image_provider="pollinations", fal_key=None, openai_key=None):
+                      image_provider="pollinations", fal_key=None, openai_key=None,
+                      target_size=None):
     """Render a single scene: merges narration audio, visuals with Ken Burns effect, subtitles, and SFX."""
     print(f"[Scene {scene_idx}] Rendering cinematic scene...")
     
@@ -585,7 +586,9 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
     cam_type = cam_info.get("type", "zoom_in")
     cam_speed = cam_info.get("speed", "slow")
     
-    target_size = (1080, 1920) if is_shorts else (1920, 1080)
+    if target_size is None:
+        target_size = (1080, 1920) if is_shorts else (1920, 1080)
+        
     visual_clip = make_ken_burns_clip(img_path, scene_duration, target_size=target_size, movement_type=cam_type, speed=cam_speed)
     
     # 3. Create Subtitle Overlay (matches original narration duration, but transparent during the breather)
@@ -633,7 +636,7 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
 def generate_full_video(topic, is_shorts=True, output_filename="final_output.mp4",
                         tts_provider="edge", tts_voice_id=None, tts_api_key=None,
                         image_provider="pollinations", fal_key=None, openai_key=None,
-                        pregenerated_script=None):
+                        pregenerated_script=None, target_size=None):
     """Entire video pipeline from scripting to final video composition with Ken Burns and ducked BGM."""
     print("[Start] Starting Cinematic AI Video Factory Pipeline...")
     
@@ -657,7 +660,8 @@ def generate_full_video(topic, is_shorts=True, output_filename="final_output.mp4
         clip = build_scene_video(
             i, scene, is_shorts=is_shorts,
             tts_provider=tts_provider, tts_voice_id=tts_voice_id, tts_api_key=tts_api_key,
-            image_provider=image_provider, fal_key=fal_key, openai_key=openai_key
+            image_provider=image_provider, fal_key=fal_key, openai_key=openai_key,
+            target_size=target_size
         )
         scene_clips.append(clip)
         

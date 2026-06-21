@@ -146,10 +146,23 @@ st.sidebar.markdown("---")
 # 3. Video Format & Upload configuration
 st.sidebar.markdown("### 🎥 동영상 포맷 & 업로드")
 format_option = st.sidebar.selectbox("비디오 포맷", ["쇼츠 (9:16 세로형)", "일반 영상 (16:9 가로형)"])
+quality_option = st.sidebar.selectbox(
+    "렌더링 화질 선택 (서버 배포용 권장: 540p)", 
+    ["540p (Cloud 최적화 - 서버용)", "720p (Standard)", "1080p (High - 로컬 PC 권장)"],
+    index=0
+)
 privacy_option = st.sidebar.selectbox("유튜브 업로드 보안 설정", ["비공개 (Private)", "공개 (Public)", "일부공개 (Unlisted)"])
 
 is_shorts = (format_option == "쇼츠 (9:16 세로형)")
 privacy_status = "private" if "비공개" in privacy_option else ("public" if "공개" in privacy_option else "unlisted")
+
+# Determine target_size
+if "540p" in quality_option:
+    target_size = (540, 960) if is_shorts else (960, 540)
+elif "720p" in quality_option:
+    target_size = (720, 1280) if is_shorts else (1280, 720)
+else: # 1080p
+    target_size = (1080, 1920) if is_shorts else (1920, 1080)
 
 # Main Interface UI
 st.markdown("<h1 class='main-title'>🎬 High-End Cinematic AI Video Factory</h1>", unsafe_allow_html=True)
@@ -208,7 +221,8 @@ if generate_btn:
                     image_provider=image_provider,
                     fal_key=fal_api_key if fal_api_key else fal_key,
                     openai_key=openai_api_key if openai_api_key else openai_key,
-                    pregenerated_script=script_data
+                    pregenerated_script=script_data,
+                    target_size=target_size
                 )
                 
                 # Copy final output to keep a stable file name
