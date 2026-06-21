@@ -16,6 +16,7 @@ audio_assets/
 *.jpg
 *.jpeg
 *.mp3
+*.m4a
 
 # IDE config
 .vscode/
