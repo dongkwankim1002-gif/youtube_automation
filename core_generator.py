@@ -964,7 +964,9 @@ def generate_full_video(topic, is_shorts=True, output_filename="final_output.mp4
     if progress_callback:
         progress_callback("MERGE")
     print("[Merge] Concatenating scenes...")
-    final_clip = concatenate_videoclips(scene_clips, method="compose")
+    # Force all clips to have the exact same fps to prevent concatenation frame rate mismatches
+    aligned_clips = [c.set_fps(24) for c in scene_clips]
+    final_clip = concatenate_videoclips(aligned_clips, method="compose")
     
     # 4. Cinematic BGM Ducking Mixer
     bgm_mood = script_data.get("overall_bgm_mood", "epic_orchestral")

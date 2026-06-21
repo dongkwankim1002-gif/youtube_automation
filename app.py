@@ -280,7 +280,8 @@ def get_progress_callback(placeholder):
             </div>
         </div>
         """
-        placeholder.markdown(html_content, unsafe_allow_html=True)
+        flat_html = "\n".join([line.strip() for line in html_content.split("\n")])
+        placeholder.markdown(flat_html, unsafe_allow_html=True)
         
     return progress_callback
 
