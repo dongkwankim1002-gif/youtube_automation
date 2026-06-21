@@ -131,8 +131,45 @@ def prepare_default_audio_assets():
         download_audio_asset(url, dest)
 
 
+def ensure_korean_font():
+    """Ensure a Korean TTF font is downloaded and available locally in the project directory."""
+    local_font_path = "nanum_gothic.ttf"
+    if os.path.exists(local_font_path) and os.path.getsize(local_font_path) > 100000:
+        return local_font_path
+    
+    url = "https://github.com/google/fonts/raw/main/ofl/nanumgothic/NanumGothic-Regular.ttf"
+    print(f"[Font] Downloading NanumGothic font dynamically: {url}...")
+    try:
+        response = requests.get(url, timeout=20)
+        if response.status_code == 200:
+            with open(local_font_path, "wb") as f:
+                f.write(response.content)
+            print("[Font] NanumGothic downloaded successfully!")
+            return local_font_path
+    except Exception as e:
+        print(f"[Font Error] Failed to download NanumGothic font: {e}")
+    return None
+
+
 def get_system_font(font_size=50):
-    """Retrieve a usable Korean font from Windows system fonts."""
+    """Retrieve a usable Korean font from local workspace or Windows system fonts."""
+    # 1. First priority: Check local NanumGothic font
+    local_font = "nanum_gothic.ttf"
+    if os.path.exists(local_font):
+        try:
+            return ImageFont.truetype(local_font, font_size)
+        except Exception:
+            pass
+            
+    # 2. Second priority: Attempt dynamic download fallback
+    downloaded_font = ensure_korean_font()
+    if downloaded_font and os.path.exists(downloaded_font):
+        try:
+            return ImageFont.truetype(downloaded_font, font_size)
+        except Exception:
+            pass
+
+    # 3. Third priority: Windows system font search paths
     font_paths = [
         "C:\\Windows\\Fonts\\malgun.ttf",       # Malgun Gothic (Windows default)
         "C:\\Windows\\Fonts\\malgunbd.ttf",     # Malgun Gothic Bold
@@ -907,6 +944,9 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
     scene_audio = CompositeAudioClip(scene_audio_tracks)
     composite_clip = composite_clip.set_audio(scene_audio)
     composite_clip.fps = 24
+    
+    # Strip mask to prevent MoviePy mask concatenation bugs that cause black screens in subsequent clips
+    composite_clip = composite_clip.without_mask()
     
     return composite_clip
 
