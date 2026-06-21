@@ -916,10 +916,13 @@ def generate_full_video(topic, is_shorts=True, output_filename="final_output.mp4
                         character_desc="", visual_style="",
                         content_skin="🎬 역사 다큐멘터리 (Historical Documentary)",
                         video_skin="Option 1: 스틸컷 & Ken Burns 연출 (AI Image + Ken Burns)",
-                        pexels_key=None):
+                        pexels_key=None, progress_callback=None):
     """Entire video pipeline from scripting to final video composition with chosen technical skin."""
     print(f"[Start] Starting Cinematic AI Video Factory Pipeline with technical skin: {video_skin}...")
     
+    if progress_callback:
+        progress_callback("PREPARE")
+        
     # Ensure default sound libraries are ready
     prepare_default_audio_assets()
     
@@ -937,6 +940,8 @@ def generate_full_video(topic, is_shorts=True, output_filename="final_output.mp4
     current_time = 0.0
     
     for i, scene in enumerate(script_data["scenes"]):
+        if progress_callback:
+            progress_callback("SCENE", i, len(script_data["scenes"]))
         clip = build_scene_video(
             i, scene, is_shorts=is_shorts,
             tts_provider=tts_provider, tts_voice_id=tts_voice_id, tts_api_key=tts_api_key,
@@ -954,6 +959,8 @@ def generate_full_video(topic, is_shorts=True, output_filename="final_output.mp4
         current_time += scene_duration
         
     # 3. Concatenate all scenes into a single video
+    if progress_callback:
+        progress_callback("MERGE")
     print("[Merge] Concatenating scenes...")
     final_clip = concatenate_videoclips(scene_clips, method="compose")
     
@@ -966,6 +973,8 @@ def generate_full_video(topic, is_shorts=True, output_filename="final_output.mp4
         
     if bgm_path and os.path.exists(bgm_path):
         try:
+            if progress_callback:
+                progress_callback("BGM")
             print(f"[BGM] Mixing and Ducking Background Music (Mood: {bgm_mood})...")
             bgm_clip = AudioFileClip(bgm_path)
             
@@ -999,6 +1008,8 @@ def generate_full_video(topic, is_shorts=True, output_filename="final_output.mp4
             print(f"[BGM Warning] Failed to mix background music: {e}")
             
     # 5. Render final MP4 output
+    if progress_callback:
+        progress_callback("RENDER")
     print(f"[Render] Rendering final output video: {output_filename}...")
     # Use unique temp audio file path in TEMP_DIR and disable MoviePy automatic deletion to prevent Windows file lock crashes
     temp_audio_path = os.path.join(TEMP_DIR, f"temp-audio-{int(time.time())}.m4a")
@@ -1025,6 +1036,8 @@ def generate_full_video(topic, is_shorts=True, output_filename="final_output.mp4
         except Exception:
             pass
             
+    if progress_callback:
+        progress_callback("DONE")
     print("[Success] Video Production Completed Successfully!")
     return output_filename, script_data
 

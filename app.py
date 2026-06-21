@@ -144,6 +144,148 @@ if "user_role" not in st.session_state:
     st.session_state.user_role = "Standard User"
 
 
+# --- 🎬 렌더링 실시간 시각화 진행 표시기 (Real-time Progress Indicator) ---
+def get_progress_callback(placeholder):
+    def progress_callback(step, index=None, total=None):
+        steps = {
+            "PREPARE": ("active", "waiting", "waiting", "waiting", "waiting", 10, "⚙️ 오디오 애셋 라이브러리 및 폰트 준비 중..."),
+            "SCENE": ("complete", "active", "waiting", "waiting", "waiting", 15, "🎬 씬 개별 비디오 제작 중..."),
+            "MERGE": ("complete", "complete", "active", "waiting", "waiting", 80, "🔗 생성된 씬 비디오 클립 연결 및 해상도 조정 중..."),
+            "BGM": ("complete", "complete", "complete", "active", "waiting", 88, "🎵 BGM 결합 및 나레이션 오토 덕킹(Ducking) 중..."),
+            "RENDER": ("complete", "complete", "complete", "complete", "active", 95, "📼 최종 H.264 MP4 비디오 렌더링 파일 출력 중..."),
+            "DONE": ("complete", "complete", "complete", "complete", "complete", 100, "🎉 영상 제작 완료!")
+        }
+        
+        status_info = steps.get(step, ("waiting", "waiting", "waiting", "waiting", "waiting", 0, "준비 중..."))
+        s1, s2, s3, s4, s5, progress_val, desc = status_info
+        
+        if step == "SCENE" and index is not None and total is not None:
+            progress_val = int(15 + (index / total) * 60)
+            desc = f"🎬 {total}개 씬 중 {index+1}번째 씬 비디오 제작 중 ({index+1}/{total})..."
+            
+        def get_badge(status):
+            if status == "active":
+                return "<span style='color: #ff4b4b; font-weight: bold; animation: blink 1.5s infinite;'>⚡ 진행 중</span>"
+            elif status == "complete":
+                return "<span style='color: #00e676; font-weight: bold;'>✅ 완료</span>"
+            else:
+                return "<span style='color: #888;'>⏳ 대기 중</span>"
+                
+        def get_class(status):
+            if status == "active":
+                return "render-step active"
+            elif status == "complete":
+                return "render-step complete"
+            else:
+                return "render-step"
+
+        html_content = f"""
+        <style>
+            @keyframes spin {{
+                0% {{ transform: rotate(0deg); }}
+                100% {{ transform: rotate(360deg); }}
+            }}
+            @keyframes blink {{
+                0% {{ opacity: 0.4; }}
+                50% {{ opacity: 1; }}
+                100% {{ opacity: 0.4; }}
+            }}
+            .render-container {{
+                background: linear-gradient(135deg, #1e1e2e, #11111b);
+                border: 2px solid #ff4b4b;
+                border-radius: 15px;
+                padding: 2rem;
+                box-shadow: 0 8px 32px rgba(255, 75, 75, 0.15);
+                margin-bottom: 2rem;
+            }}
+            .render-header {{
+                display: flex;
+                align-items: center;
+                gap: 1.5rem;
+                margin-bottom: 1.5rem;
+                border-bottom: 1px solid #333;
+                padding-bottom: 1.2rem;
+            }}
+            .render-spinner {{
+                border: 5px solid rgba(255, 75, 75, 0.1);
+                width: 55px;
+                height: 55px;
+                border-radius: 50%;
+                border-left-color: #ff4b4b;
+                animation: spin 1s linear infinite;
+            }}
+            .render-step {{
+                padding: 0.9rem 1.2rem;
+                border-radius: 10px;
+                background: #181824;
+                margin-bottom: 0.8rem;
+                border-left: 5px solid #333;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                transition: all 0.3s ease;
+            }}
+            .render-step.active {{
+                border-left-color: #ff4b4b;
+                background: #2b1f24;
+                box-shadow: 0 0 15px rgba(255, 75, 75, 0.15);
+            }}
+            .render-step.complete {{
+                border-left-color: #00e676;
+                background: #1b261e;
+            }}
+            .step-title {{
+                font-weight: 600;
+                font-size: 1.05rem;
+            }}
+        </style>
+        <div class='render-container'>
+            <div class='render-header'>
+                {f"<div class='render-spinner'></div>" if step != "DONE" else "<span style='font-size:2.2rem;'>🎉</span>"}
+                <div>
+                    <h3 style='margin:0; color:#ff4b4b; font-size:1.6rem; font-weight:800;'>🎬 AI 비디오 제작 파이프라인 가동 중</h3>
+                    <p style='margin:0.2rem 0 0 0; color:#a0a0c0; font-size:0.98rem;'>{desc}</p>
+                </div>
+            </div>
+            
+            <div style='margin-bottom: 1.5rem;'>
+                <div style='display:flex; justify-content:space-between; color:#a0a0c0; font-size:0.9rem; margin-bottom:0.4rem;'>
+                    <span>제작 진행률</span>
+                    <strong>{progress_val}%</strong>
+                </div>
+                <div style='background-color:#2a2a3a; height:12px; border-radius:6px; overflow:hidden;'>
+                    <div style='background-color:#ff4b4b; width:{progress_val}%; height:100%; border-radius:6px; transition:width 0.5s ease-in-out;'></div>
+                </div>
+            </div>
+            
+            <div class='{get_class(s1)}'>
+                <span class='step-title'>🎙️ 1단계: 기본 오디오 애셋 로딩 및 준비</span>
+                {get_badge(s1)}
+            </div>
+            <div class='{get_class(s2)}'>
+                <span class='step-title'>🎨 2단계: 씬별 성우 나레이션 & 이미지 비주얼 생성</span>
+                {get_badge(s2)}
+            </div>
+            <div class='{get_class(s3)}'>
+                <span class='step-title'>🔗 3단계: 비주얼 클립 해상도 매칭 및 영상 병합</span>
+                {get_badge(s3)}
+            </div>
+            <div class='{get_class(s4)}'>
+                <span class='step-title'>🎵 4단계: 시네마틱 BGM 결합 및 볼륨 오토 덕킹</span>
+                {get_badge(s4)}
+            </div>
+            <div class='{get_class(s5)}'>
+                <span class='step-title'>📼 5단계: 최종 MP4 비디오 렌더링 파일 인코딩 및 출력</span>
+                {get_badge(s5)}
+            </div>
+        </div>
+        """
+        placeholder.markdown(html_content, unsafe_allow_html=True)
+        
+    return progress_callback
+
+
+
 # --- 📂 VERSION SWITCHER AT THE VERY TOP ---
 st.markdown("""
 <div style='background: linear-gradient(135deg, #1e1e2e, #11111b); padding: 1.5rem; border-radius: 12px; border: 2px solid #ff4b4b; margin-bottom: 1.5rem; box-shadow: 0 4px 20px rgba(255, 75, 75, 0.15);'>
@@ -582,103 +724,105 @@ if "v3.0.0" in selected_version:
                 st.session_state.step = "input"
                 st.rerun()
                 
-            with st.status("🎬 시네마틱 비디오 제작 공장 가동 중...", expanded=True) as status:
-                try:
-                    import core_generator
-                    
-                    active_gemini_key = st.session_state.api_gemini if st.session_state.api_gemini else gemini_key
-                    active_eleven_key = st.session_state.api_eleven if st.session_state.api_eleven else elevenlabs_key
-                    active_fal_key = st.session_state.api_fal if st.session_state.api_fal else fal_key
-                    active_openai_key = st.session_state.api_openai if st.session_state.api_openai else openai_key
-                    active_pexels_key = st.session_state.api_pexels if st.session_state.api_pexels else pexels_key
-                    
-                    os.environ["GEMINI_API_KEY"] = active_gemini_key
-                    if active_eleven_key:
-                        os.environ["ELEVENLABS_API_KEY"] = active_eleven_key
-                    if active_fal_key:
-                        os.environ["FAL_API_KEY"] = active_fal_key
-                        os.environ["FAL_KEY"] = active_fal_key
-                    if active_openai_key:
-                        os.environ["OPENAI_API_KEY"] = active_openai_key
-                    if active_pexels_key:
-                        os.environ["PEXELS_API_KEY"] = active_pexels_key
+            progress_area = st.empty()
+            cb = get_progress_callback(progress_area)
+            
+            try:
+                import core_generator
+                
+                active_gemini_key = st.session_state.api_gemini if st.session_state.api_gemini else gemini_key
+                active_eleven_key = st.session_state.api_eleven if st.session_state.api_eleven else elevenlabs_key
+                active_fal_key = st.session_state.api_fal if st.session_state.api_fal else fal_key
+                active_openai_key = st.session_state.api_openai if st.session_state.api_openai else openai_key
+                active_pexels_key = st.session_state.api_pexels if st.session_state.api_pexels else pexels_key
+                
+                os.environ["GEMINI_API_KEY"] = active_gemini_key
+                if active_eleven_key:
+                    os.environ["ELEVENLABS_API_KEY"] = active_eleven_key
+                if active_fal_key:
+                    os.environ["FAL_API_KEY"] = active_fal_key
+                    os.environ["FAL_KEY"] = active_fal_key
+                if active_openai_key:
+                    os.environ["OPENAI_API_KEY"] = active_openai_key
+                if active_pexels_key:
+                    os.environ["PEXELS_API_KEY"] = active_pexels_key
 
-                    output_filename = "final_output.mp4"
-                    status.write("⚙️ 1단계: 성우 나레이션 및 비주얼 클립 구성 중...")
+                output_filename = "final_output.mp4"
+                
+                video_path, script_data = core_generator.generate_full_video(
+                    st.session_state.topic, 
+                    is_shorts=st.session_state.is_shorts, 
+                    output_filename=output_filename,
+                    tts_provider=st.session_state.tts_provider,
+                    tts_voice_id=st.session_state.tts_voice_id,
+                    tts_api_key=active_eleven_key,
+                    image_provider=st.session_state.image_provider,
+                    fal_key=active_fal_key,
+                    openai_key=active_openai_key,
+                    pregenerated_script=st.session_state.script_data,
+                    target_size=st.session_state.target_size,
+                    content_skin=st.session_state.content_genre,
+                    video_skin=st.session_state.video_skin,
+                    pexels_key=active_pexels_key,
+                    progress_callback=cb
+                )
+                
+                stable_video_path = "output_render.mp4"
+                shutil.copy(video_path, stable_video_path)
+                st.session_state.final_video_path = stable_video_path
+                
+                cb("RENDER")  # Update to final render (Thumbnails & Packaging)
+                thumbnail_path = "thumbnail_output.png"
+                
+                core_generator.generate_cinematic_image(
+                    f"A dramatic and historical scene representing {st.session_state.topic}, digital art, masterpiece, realistic, cinematic lighting",
+                    "temp_thumb_bg.jpg",
+                    is_shorts=False,
+                    provider=st.session_state.image_provider,
+                    fal_key=active_fal_key,
+                    openai_key=active_openai_key
+                )
+                
+                thumb_bg = Image.open("temp_thumb_bg.jpg")
+                thumb_bg = thumb_bg.resize((1280, 720))
+                draw = ImageDraw.Draw(thumb_bg)
+                font = core_generator.get_system_font(font_size=80)
+                
+                clean_title = st.session_state.script_data.get("title", st.session_state.topic)
+                lines = core_generator.wrap_text(clean_title, font, 1100, draw)
+                
+                current_y = 180
+                for line in lines:
+                    bbox = draw.textbbox((0, 0), line, font=font) if hasattr(draw, "textbbox") else draw.textsize(line, font=font)
+                    line_w = bbox[2] - bbox[0] if hasattr(draw, "textbbox") else bbox[0]
+                    line_h = bbox[3] - bbox[1] if hasattr(draw, "textbbox") else bbox[1]
+                    x = (1280 - line_w) // 2
                     
-                    video_path, script_data = core_generator.generate_full_video(
-                        st.session_state.topic, 
-                        is_shorts=st.session_state.is_shorts, 
-                        output_filename=output_filename,
-                        tts_provider=st.session_state.tts_provider,
-                        tts_voice_id=st.session_state.tts_voice_id,
-                        tts_api_key=active_eleven_key,
-                        image_provider=st.session_state.image_provider,
-                        fal_key=active_fal_key,
-                        openai_key=active_openai_key,
-                        pregenerated_script=st.session_state.script_data,
-                        target_size=st.session_state.target_size,
-                        content_skin=st.session_state.content_genre,
-                        video_skin=st.session_state.video_skin,
-                        pexels_key=active_pexels_key
-                    )
+                    stroke_w = 6
+                    for dx in range(-stroke_w, stroke_w+1):
+                        for dy in range(-stroke_w, stroke_w+1):
+                            draw.text((x+dx, current_y+dy), line, font=font, fill=(0, 0, 0, 255))
+                            
+                    draw.text((x, current_y), line, font=font, fill=(255, 235, 59, 255))
+                    current_y += line_h + 20
                     
-                    stable_video_path = "output_render.mp4"
-                    shutil.copy(video_path, stable_video_path)
-                    st.session_state.final_video_path = stable_video_path
+                thumb_bg.save(thumbnail_path)
+                st.session_state.thumbnail_path = thumbnail_path
+                
+                try:
+                    os.remove("temp_thumb_bg.jpg")
+                except Exception:
+                    pass
                     
-                    status.write("🖼️ 2단계: Pillow를 사용한 맞춤형 썸네일 합성 중...")
-                    thumbnail_path = "thumbnail_output.png"
-                    
-                    core_generator.generate_cinematic_image(
-                        f"A dramatic and historical scene representing {st.session_state.topic}, digital art, masterpiece, realistic, cinematic lighting",
-                        "temp_thumb_bg.jpg",
-                        is_shorts=False,
-                        provider=st.session_state.image_provider,
-                        fal_key=active_fal_key,
-                        openai_key=active_openai_key
-                    )
-                    
-                    thumb_bg = Image.open("temp_thumb_bg.jpg")
-                    thumb_bg = thumb_bg.resize((1280, 720))
-                    draw = ImageDraw.Draw(thumb_bg)
-                    font = core_generator.get_system_font(font_size=80)
-                    
-                    clean_title = st.session_state.script_data.get("title", st.session_state.topic)
-                    lines = core_generator.wrap_text(clean_title, font, 1100, draw)
-                    
-                    current_y = 180
-                    for line in lines:
-                        bbox = draw.textbbox((0, 0), line, font=font) if hasattr(draw, "textbbox") else draw.textsize(line, font=font)
-                        line_w = bbox[2] - bbox[0] if hasattr(draw, "textbbox") else bbox[0]
-                        line_h = bbox[3] - bbox[1] if hasattr(draw, "textbbox") else bbox[1]
-                        x = (1280 - line_w) // 2
-                        
-                        stroke_w = 6
-                        for dx in range(-stroke_w, stroke_w+1):
-                            for dy in range(-stroke_w, stroke_w+1):
-                                draw.text((x+dx, current_y+dy), line, font=font, fill=(0, 0, 0, 255))
-                                
-                        draw.text((x, current_y), line, font=font, fill=(255, 235, 59, 255))
-                        current_y += line_h + 20
-                        
-                    thumb_bg.save(thumbnail_path)
-                    st.session_state.thumbnail_path = thumbnail_path
-                    
-                    try:
-                        os.remove("temp_thumb_bg.jpg")
-                    except Exception:
-                        pass
-                        
-                    status.update(label="🎉 비디오 렌더링 완료!", state="complete", expanded=False)
-                    st.session_state.step = "result"
+                cb("DONE")
+                time.sleep(1.5)
+                st.session_state.step = "result"
+                st.rerun()
+            except Exception as e:
+                st.error(f"❌ 영상 제작 중 오류 발생: {e}")
+                if st.button("↩️ 편집 단계로 돌아가기"):
+                    st.session_state.step = "edit"
                     st.rerun()
-                except Exception as e:
-                    status.update(label="❌ 영상 제작 중 오류 발생", state="error")
-                    st.error(f"오류 상세: {e}")
-                    if st.button("↩️ 편집 단계로 돌아가기"):
-                        st.session_state.step = "edit"
-                        st.rerun()
 
         elif st.session_state.step == "result":
             st.markdown("### 🎉 4단계: 비디오 제작 및 업로드 결과")
