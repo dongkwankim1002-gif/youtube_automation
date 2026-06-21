@@ -260,7 +260,7 @@ def generate_voice_over(text, output_path, provider="edge", voice_id=None, api_k
     return "edge"
 
 
-def generate_script_from_gemini(topic, is_shorts=True):
+def generate_script_from_gemini(topic, is_shorts=True, character_desc="", visual_style=""):
     """Use Gemini 2.5 Pro to structure a high-fidelity cinematic script containing visual, camera, BGM, and SFX directives."""
     from google import genai
     
@@ -274,11 +274,18 @@ def generate_script_from_gemini(topic, is_shorts=True):
     duration_guide = "1분 이내 (쇼츠 포맷, 씬 4~5개 분량)" if is_shorts else "5분 내외 (일반 영상 포맷, 씬 10~15개 분량)"
     layout_guide = "세로형 (9:16)" if is_shorts else "가로형 (16:9)"
     
+    consistency_guide = ""
+    if character_desc:
+        consistency_guide += f"\n- 주요 등장인물 묘사: {character_desc}\n  (중요: 캐릭터가 등장하는 모든 씬의 'visual_prompt'에는 해당 인물의 이름과 함께 위 묘사의 세부 외모 특징들을 반드시 구체적으로 기술하여 이미지 모델이 일관된 외모로 그리도록 하십시오.)"
+    if visual_style:
+        consistency_guide += f"\n- 비주얼 화풍 및 아트 스타일: {visual_style}\n  (중요: 모든 씬의 'visual_prompt'는 이 비주얼 화풍 가이드라인을 반영하여 통일성 있게 묘사해 주십시오.)"
+    
     prompt = f"""
     당신은 넷플릭스 역사 다큐멘터리 전문 감독이자 연출가입니다.
     주제: "{topic}"에 대해 시청자가 숨을 죽이고 몰입할 수 있는 최고의 시네마틱 비디오 시나리오를 설계해 주세요.
     분량 가이드: {duration_guide}
     영상 비율: {layout_guide}
+    {consistency_guide}
 
     반드시 아래 JSON 형식으로만 응답하세요. 다른 설명이나 텍스트는 일체 생략하고 순수 JSON 데이터만 반환해야 합니다.
 
@@ -555,6 +562,7 @@ def make_ken_burns_clip(image_path, duration, target_size=(1080, 1920), movement
         return np.array(final_frame)
         
     clip = VideoClip(make_frame, duration=duration)
+    clip.size = target_size
     return clip
 
 
@@ -597,7 +605,7 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
     sub_clip = ImageClip(subtitle_path).set_duration(narr_duration)
     
     # Composite visual & subtitles
-    composite_clip = CompositeVideoClip([visual_clip, sub_clip.set_start(0)])
+    composite_clip = CompositeVideoClip([visual_clip, sub_clip.set_start(0)], size=target_size).set_duration(scene_duration)
     
     # 4. Sound Design (Narration + SFX mixing)
     scene_audio_tracks = [narr_clip.set_start(0)]
@@ -636,7 +644,8 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
 def generate_full_video(topic, is_shorts=True, output_filename="final_output.mp4",
                         tts_provider="edge", tts_voice_id=None, tts_api_key=None,
                         image_provider="pollinations", fal_key=None, openai_key=None,
-                        pregenerated_script=None, target_size=None):
+                        pregenerated_script=None, target_size=None,
+                        character_desc="", visual_style=""):
     """Entire video pipeline from scripting to final video composition with Ken Burns and ducked BGM."""
     print("[Start] Starting Cinematic AI Video Factory Pipeline...")
     
@@ -648,7 +657,7 @@ def generate_full_video(topic, is_shorts=True, output_filename="final_output.mp4
         script_data = pregenerated_script
         print("[Script] Using pre-generated script.")
     else:
-        script_data = generate_script_from_gemini(topic, is_shorts)
+        script_data = generate_script_from_gemini(topic, is_shorts, character_desc, visual_style)
         print(f"[Script] Script Generated! Title: {script_data['title']}")
     
     # 2. Build individual scene video clips
