@@ -131,30 +131,61 @@ def prepare_default_audio_assets():
         download_audio_asset(url, dest)
 
 
-def ensure_korean_font():
+# Keywords for subtitle text highlighting (Minimal History Style)
+SUBTITLE_KEYWORDS = {
+    "혈액형", "말라리아", "페스트", "진화", "생존", "돌연변이", "인류", "역사", "비밀", "질병", 
+    "바이러스", "감염", "수혈", "콜레라", "노벨상", "유전자", "면역", "병원균", "사망률", "저항력",
+    "A형", "B형", "O형", "AB형", "적혈구", "항원", "항체", "유전", "발견", "치명적", "기록", "전쟁",
+    "황열병", "매독", "코로나", "흑사병", "생명", "수혈사고", "생명력", "자연선택", "도태"
+}
+
+def is_keyword_word(word):
+    """Determine if a word contains a key evolutionary/historical keyword or digits."""
+    # Strip common postpositions or punctuation for matching
+    cleaned = re.sub(r'[은는이가을를의과와에로으로은는이]$', '', word)
+    cleaned = re.sub(r'[^a-zA-Z0-9가-힣]', '', cleaned) # alphanumeric only
+    
+    # Check against our set of keywords
+    for kw in SUBTITLE_KEYWORDS:
+        if kw in cleaned:
+            return True
+            
+    # Highlight numbers/years/percentages (e.g., 1901년, 10%)
+    if any(char.isdigit() for char in cleaned):
+        return True
+        
+    return False
+
+
+def ensure_korean_font(font_style="gothic"):
     """Ensure a Korean TTF font is downloaded and available locally in the project directory."""
-    local_font_path = "nanum_gothic.ttf"
+    if font_style == "serif":
+        local_font_path = "nanum_myeongjo.ttf"
+        url = "https://github.com/google/fonts/raw/main/ofl/nanummyeongjo/NanumMyeongjo-Regular.ttf"
+    else:
+        local_font_path = "nanum_gothic.ttf"
+        url = "https://github.com/google/fonts/raw/main/ofl/nanumgothic/NanumGothic-Regular.ttf"
+        
     if os.path.exists(local_font_path) and os.path.getsize(local_font_path) > 100000:
         return local_font_path
     
-    url = "https://github.com/google/fonts/raw/main/ofl/nanumgothic/NanumGothic-Regular.ttf"
-    print(f"[Font] Downloading NanumGothic font dynamically: {url}...")
+    print(f"[Font] Downloading {font_style} font dynamically: {url}...")
     try:
         response = requests.get(url, timeout=20)
         if response.status_code == 200:
             with open(local_font_path, "wb") as f:
                 f.write(response.content)
-            print("[Font] NanumGothic downloaded successfully!")
+            print(f"[Font] {font_style} downloaded successfully!")
             return local_font_path
     except Exception as e:
-        print(f"[Font Error] Failed to download NanumGothic font: {e}")
+        print(f"[Font Error] Failed to download {font_style} font: {e}")
     return None
 
 
-def get_system_font(font_size=50):
+def get_system_font(font_size=50, font_style="gothic"):
     """Retrieve a usable Korean font from local workspace or Windows system fonts."""
-    # 1. First priority: Check local NanumGothic font
-    local_font = "nanum_gothic.ttf"
+    # 1. First priority: Check local custom font
+    local_font = "nanum_myeongjo.ttf" if font_style == "serif" else "nanum_gothic.ttf"
     if os.path.exists(local_font):
         try:
             return ImageFont.truetype(local_font, font_size)
@@ -162,7 +193,7 @@ def get_system_font(font_size=50):
             pass
             
     # 2. Second priority: Attempt dynamic download fallback
-    downloaded_font = ensure_korean_font()
+    downloaded_font = ensure_korean_font(font_style)
     if downloaded_font and os.path.exists(downloaded_font):
         try:
             return ImageFont.truetype(downloaded_font, font_size)
@@ -170,12 +201,19 @@ def get_system_font(font_size=50):
             pass
 
     # 3. Third priority: Windows system font search paths
-    font_paths = [
-        "C:\\Windows\\Fonts\\malgun.ttf",       # Malgun Gothic (Windows default)
-        "C:\\Windows\\Fonts\\malgunbd.ttf",     # Malgun Gothic Bold
-        "C:\\Windows\\Fonts\\batang.ttc",       # Batang
-        "C:\\Windows\\Fonts\\gulim.ttc"         # Gulim
-    ]
+    if font_style == "serif":
+        font_paths = [
+            "C:\\Windows\\Fonts\\batang.ttc",       # Batang (Serif default)
+            "C:\\Windows\\Fonts\\malgun.ttf",       # Malgun Gothic
+            "C:\\Windows\\Fonts\\gulim.ttc"         # Gulim
+        ]
+    else:
+        font_paths = [
+            "C:\\Windows\\Fonts\\malgun.ttf",       # Malgun Gothic (Windows default)
+            "C:\\Windows\\Fonts\\malgunbd.ttf",     # Malgun Gothic Bold
+            "C:\\Windows\\Fonts\\batang.ttc",       # Batang
+            "C:\\Windows\\Fonts\\gulim.ttc"         # Gulim
+        ]
     for path in font_paths:
         if os.path.exists(path):
             try:
@@ -217,13 +255,13 @@ def wrap_text(text, font, max_width, draw):
     return lines
 
 
-def create_subtitle_image(text, width=1080, height=1920, font_size=48, output_path="subtitle.png", position="bottom"):
-    """Create a transparent PNG containing styled Korean subtitle text at the bottom or center."""
+def create_subtitle_image(text, width=1080, height=1920, font_size=48, output_path="subtitle.png", position="bottom", font_style="gothic"):
+    """Create a transparent PNG containing styled Korean subtitle text with word-level gold highlighting."""
     # Create transparent image
     image = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
     
-    font = get_system_font(font_size)
+    font = get_system_font(font_size, font_style=font_style)
     
     # Wrap text to fit screen width (with safety padding)
     max_text_width = int(width * 0.85)
@@ -267,24 +305,43 @@ def create_subtitle_image(text, width=1080, height=1920, font_size=48, output_pa
         rect_y1 = current_y + line_h + padding
         draw.rounded_rectangle([rect_x0, rect_y0, rect_x1, rect_y1], radius=10, fill=(0, 0, 0, 150))
         
-        # Draw actual text
-        draw.text((x, current_y), line, font=font, fill=(255, 255, 255, 255))
-        
+        # Draw actual text with word-level highlight
+        words_in_line = line.split(" ")
+        curr_x = x
+        for word in words_in_line:
+            highlight = is_keyword_word(word)
+            # Gold color for keywords, White for standard text
+            color = (255, 215, 0, 255) if highlight else (255, 255, 255, 255)
+            
+            draw.text((curr_x, current_y), word, font=font, fill=color)
+            
+            # Measure word and trailing space to update horizontal offset
+            if hasattr(draw, "textbbox"):
+                word_bbox = draw.textbbox((0, 0), word, font=font)
+                word_w = word_bbox[2] - word_bbox[0]
+                space_bbox = draw.textbbox((0, 0), " ", font=font)
+                space_w = space_bbox[2] - space_bbox[0]
+            else:
+                word_w, _ = draw.textsize(word, font=font)
+                space_w, _ = draw.textsize(" ", font=font)
+                
+            curr_x += word_w + space_w
+            
         current_y += line_h + 15
         
     image.save(output_path)
     return output_path
 
 
-async def generate_tts_async(text, output_path, voice="ko-KR-InJoonNeural"):
-    """Synthesize speech using Microsoft Edge TTS asynchronously."""
-    communicate = edge_tts.Communicate(text, voice)
+async def generate_tts_async(text, output_path, voice="ko-KR-InJoonNeural", rate="-12%"):
+    """Synthesize speech using Microsoft Edge TTS asynchronously with custom speed rate."""
+    communicate = edge_tts.Communicate(text, voice, rate=rate)
     await communicate.save(output_path)
 
 
-def generate_tts(text, output_path, voice="ko-KR-InJoonNeural"):
+def generate_tts(text, output_path, voice="ko-KR-InJoonNeural", rate="-12%"):
     """Sync wrapper for the Edge TTS async function."""
-    asyncio.run(generate_tts_async(text, output_path, voice))
+    asyncio.run(generate_tts_async(text, output_path, voice, rate=rate))
 
 
 def generate_elevenlabs_tts(text, output_path, voice_id="pNInz6obpgq5mWzIA5FD", api_key=None):
@@ -315,7 +372,7 @@ def generate_elevenlabs_tts(text, output_path, voice_id="pNInz6obpgq5mWzIA5FD", 
         raise Exception(f"ElevenLabs TTS failed: Status {response.status_code}, {response.text}")
 
 
-def generate_voice_over(text, output_path, provider="edge", voice_id=None, api_key=None):
+def generate_voice_over(text, output_path, provider="edge", voice_id=None, api_key=None, rate="-12%"):
     """Synthesize speech with selected provider and fallback to edge-tts if it fails."""
     if provider == "elevenlabs":
         try:
@@ -329,7 +386,7 @@ def generate_voice_over(text, output_path, provider="edge", voice_id=None, api_k
             
     # Default to Edge-TTS
     edge_voice = voice_id if voice_id and voice_id.startswith("ko-KR") else "ko-KR-InJoonNeural"
-    generate_tts(text, output_path, voice=edge_voice)
+    generate_tts(text, output_path, voice=edge_voice, rate=rate)
     print(f"[TTS] Microsoft Edge TTS ({edge_voice}) succeeded!")
     return "edge"
 
@@ -368,6 +425,12 @@ def generate_script_from_gemini(topic, is_shorts=True, character_desc="", visual
     영상 비율: {layout_guide}
     기본 비주얼 연출 스타일: {recommended_visual}
     {consistency_guide}
+
+    [대본 구성 및 연출 지침 (Minimal History Style)]:
+    1. 인트로 훅 (Scene 1): 일반적인 상식이나 당연한 것에 의문을 제기하는 강렬한 미스터리 질문으로 시작하여 시청자를 사로잡으십시오. (예: "혈액형은 단순히 병원에서 확인하는 수혈용 정보가 아닙니다. 그것은 수백만 년 동안...")
+    2. 전개 (중간 Scene들): 인물들의 생존의 사투, 역사적 발견 과정, 또는 자연적 인과관계를 영화적인 긴장감을 가지고 시간순 혹은 논리적 구조로 추적하십시오.
+    3. 아웃트로 (마지막 Scene): 단순 요약이 아닌, 역사적 혹은 인문학적 깊이를 지닌 철학적 성찰과 여운을 남기는 여운으로 장엄하게 마무리하십시오.
+    4. 대본 분량 제어: 느린 발화 속도(-12% 감속)에 어울리도록, 각 씬의 나레이션(narration) 문장은 너무 길지 않고 정돈된 2~3문장 이내(쇼츠 기준 공백 포함 60~80자 내외, 일반 영상 기준 120~150자 내외)로 끊어 주십시오.
 
     반드시 아래 JSON 형식으로만 응답하세요. 다른 설명이나 텍스트는 일체 생략하고 순수 JSON 데이터만 반환해야 합니다.
 
@@ -799,7 +862,7 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
                       tts_provider="edge", tts_voice_id=None, tts_api_key=None,
                       image_provider="pollinations", fal_key=None, openai_key=None,
                       target_size=None, video_skin="Option 1: 스틸컷 & Ken Burns 연출 (AI Image + Ken Burns)",
-                      pexels_key=None, topic=""):
+                      pexels_key=None, topic="", content_skin="🎬 역사 다큐멘터리 (Historical Documentary)"):
     """Render a single scene: merges narration audio, visuals based on selected technical skin, subtitles, and SFX."""
     print(f"[Scene {scene_idx}] Rendering scene with skin: {video_skin}...")
     
@@ -807,8 +870,12 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
     img_path = os.path.join(TEMP_DIR, f"visual_{scene_idx}.jpg")
     subtitle_path = os.path.join(TEMP_DIR, f"sub_{scene_idx}.png")
     
+    # Set narration pace rate dynamically based on content skin (historical/horror/fiction should be slow)
+    is_slow_skin = "역사" in content_skin or "소설" in content_skin or "공포" in content_skin
+    tts_rate = "-12%" if is_slow_skin else "-2%"
+    
     # 1. Synthesize narration
-    generate_voice_over(scene_data["narration"], audio_path, provider=tts_provider, voice_id=tts_voice_id, api_key=tts_api_key)
+    generate_voice_over(scene_data["narration"], audio_path, provider=tts_provider, voice_id=tts_voice_id, api_key=tts_api_key, rate=tts_rate)
     narr_clip = AudioFileClip(audio_path)
     narr_duration = narr_clip.duration
     
@@ -826,6 +893,13 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
         try:
             video_clip_path = os.path.join(TEMP_DIR, f"video_{scene_idx}.mp4")
             prompt = scene_data.get("visual_prompt", "A dramatic cinematic scene")
+            
+            # Apply global visual style guidelines for AI video prompt
+            if "역사" in content_skin:
+                prompt = f"Moody historical oil painting style, dark academia, dramatic chiaroscuro, {prompt}, cinematic, 8k"
+            elif "공포" in content_skin:
+                prompt = f"Dark gothic horror scene, misty, dramatic moonlight, {prompt}, scary, 8k"
+                
             generate_fal_ai_video(prompt, video_clip_path, is_shorts=is_shorts, api_key=fal_key)
             
             raw_vid_clip = VideoFileClip(video_clip_path)
@@ -871,6 +945,15 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
     # Default fallback / Option 1 / Option 4 background
     if visual_clip is None:
         prompt = scene_data.get("visual_prompt", "A dramatic cinematic scene")
+        
+        # Apply global visual style guidelines dynamically for AI images
+        if "역사" in content_skin:
+            prompt = f"Masterpiece, oil painting style, dark academia atmosphere, dramatic chiaroscuro lighting, deep contrast:1.2, {prompt}, moody historical illustration, highly detailed, cinematic texture, 8k, muted colors, soft vignetting"
+        elif "공포" in content_skin:
+            prompt = f"Dark gothic horror illustration, misty foggy atmosphere, dramatic moonlight, spooky shadows, {prompt}, masterpiece, 8k, highly detailed, chilling ambiance"
+        elif "소설" in content_skin:
+            prompt = f"Fantasy watercolor illustration, soft dreamlike warm light, pastel color palette, emotional scenery, {prompt}, masterpiece, highly detailed, fairytale aesthetic"
+            
         generate_cinematic_image(prompt, img_path, is_shorts=is_shorts, provider=image_provider, fal_key=fal_key, openai_key=openai_key)
         
         cam_info = scene_data.get("camera_movement", {})
@@ -881,7 +964,9 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
     # 3. Create Subtitle Overlay
     # Option 5 places subtitle in center
     sub_position = "center" if "Option 5" in video_skin else "bottom"
-    create_subtitle_image(scene_data["narration"], width, height, font_size=56 if sub_position == "center" else 42, output_path=subtitle_path, position=sub_position)
+    is_serif = "역사" in content_skin or "소설" in content_skin or "공포" in content_skin
+    f_style = "serif" if is_serif else "gothic"
+    create_subtitle_image(scene_data["narration"], width, height, font_size=56 if sub_position == "center" else 42, output_path=subtitle_path, position=sub_position, font_style=f_style)
     sub_clip = ImageClip(subtitle_path).set_duration(narr_duration)
     
     # 4. Talking Avatar overlay (Option 4)
@@ -941,7 +1026,7 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
             except Exception as e:
                 print(f"[Scene {scene_idx} Warning] Failed to mix SFX: {e}")
                 
-    scene_audio = CompositeAudioClip(scene_audio_tracks)
+    scene_audio = CompositeAudioClip(scene_audio_tracks).set_duration(scene_duration)
     composite_clip = composite_clip.set_audio(scene_audio)
     composite_clip.fps = 24
     
@@ -989,7 +1074,7 @@ def generate_full_video(topic, is_shorts=True, output_filename="final_output.mp4
             tts_provider=tts_provider, tts_voice_id=tts_voice_id, tts_api_key=tts_api_key,
             image_provider=image_provider, fal_key=fal_key, openai_key=openai_key,
             target_size=target_size, video_skin=video_skin, pexels_key=pexels_key,
-            topic=topic
+            topic=topic, content_skin=content_skin
         )
         scene_clips.append(clip)
         
@@ -1031,25 +1116,55 @@ def generate_full_video(topic, is_shorts=True, output_filename="final_output.mp4
             print(f"[BGM] Mixing and Ducking Background Music (Mood: {bgm_mood})...")
             bgm_clip = AudioFileClip(bgm_path)
             
-            # Loop/fit BGM to total duration
+            # Loop/fit BGM to total duration using MoviePy's afx.audio_loop
+            import moviepy.audio.fx.all as afx
             if bgm_clip.duration < final_clip.duration:
-                bgm_clip = bgm_clip.loop(duration=final_clip.duration)
+                bgm_clip = afx.audio_loop(bgm_clip, duration=final_clip.duration)
             else:
                 bgm_clip = bgm_clip.subclip(0, final_clip.duration)
                 
+            def get_single_volume(t_val):
+                vol = 0.22  # Base volume (22%)
+                fade_duration = 0.8
+                for start, narr_end, end in scenes_timeline:
+                    if start - fade_duration <= t_val <= narr_end + fade_duration:
+                        if t_val < start:
+                            # Fade out: linear interpolation from 0.22 down to 0.05
+                            v_val = 0.22 - (0.22 - 0.05) * (t_val - (start - fade_duration)) / fade_duration
+                        elif t_val > narr_end:
+                            # Fade in: linear interpolation from 0.05 up to 0.22
+                            v_val = 0.05 + (0.22 - 0.05) * (t_val - narr_end) / fade_duration
+                        else:
+                            # Inside narration: full duck
+                            v_val = 0.05
+                        vol = min(vol, v_val)
+                return max(0.05, min(0.22, vol))
+
             # Create the dynamic volume filter
             def volume_filter(t):
                 if isinstance(t, np.ndarray):
-                    v = np.ones_like(t) * 0.25  # Unducked volume (25%)
+                    v = np.ones_like(t) * 0.22
                     for start, narr_end, end in scenes_timeline:
-                        active_mask = (t >= start) & (t <= narr_end)
-                        v[active_mask] = 0.08  # Ducked volume (8%)
+                        fade_duration = 0.8
+                        # 1. Fade out region: [start - fade_duration, start]
+                        fade_out_mask = (t >= start - fade_duration) & (t < start)
+                        if np.any(fade_out_mask):
+                            fade_out_vals = 0.22 - (0.22 - 0.05) * (t[fade_out_mask] - (start - fade_duration)) / fade_duration
+                            v[fade_out_mask] = np.minimum(v[fade_out_mask], fade_out_vals)
+                            
+                        # 2. Narration region: [start, narr_end]
+                        narr_mask = (t >= start) & (t <= narr_end)
+                        v[narr_mask] = np.minimum(v[narr_mask], 0.05)
+                        
+                        # 3. Fade in region: [narr_end, narr_end + fade_duration]
+                        fade_in_mask = (t > narr_end) & (t <= narr_end + fade_duration)
+                        if np.any(fade_in_mask):
+                            fade_in_vals = 0.05 + (0.22 - 0.05) * (t[fade_in_mask] - narr_end) / fade_duration
+                            v[fade_in_mask] = np.minimum(v[fade_in_mask], fade_in_vals)
+                            
                     return v[:, np.newaxis]
                 else:
-                    for start, narr_end, end in scenes_timeline:
-                        if start <= t <= narr_end:
-                            return 0.08
-                    return 0.25
+                    return get_single_volume(t)
                     
             # Apply volume filter over time
             ducked_bgm = bgm_clip.fl(lambda gf, t: gf(t) * volume_filter(t))
