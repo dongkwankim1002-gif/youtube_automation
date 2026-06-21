@@ -966,7 +966,16 @@ def generate_full_video(topic, is_shorts=True, output_filename="final_output.mp4
     print("[Merge] Concatenating scenes...")
     # Force all clips to have the exact same fps to prevent concatenation frame rate mismatches
     aligned_clips = [c.set_fps(24) for c in scene_clips]
-    final_clip = concatenate_videoclips(aligned_clips, method="compose")
+    
+    # [Andrej Karpathy Style: First-principles timeline alignment]
+    # In MoviePy 1.x, concatenate_videoclips(..., method="compose") wraps the subclips inside a single large 
+    # CompositeVideoClip and offsets their start times (clip.set_start(t)). When the subclips are themselves 
+    # nested CompositeVideoClips (e.g., background + subtitles + talking avatar overlays), the timeline 
+    # translations (t - start) get double-applied or desynchronized, causing later scenes to render as black/corrupted frames.
+    # By using method="chain" (the default), MoviePy sequentially chains the frames of successive clips directly.
+    # This completely bypasses the nested timeline mapping bug. Since all our clips are strictly resized to the
+    # target size and set to 24 FPS, method="chain" is clean, robust, and extremely fast.
+    final_clip = concatenate_videoclips(aligned_clips, method="chain")
     
     # 4. Cinematic BGM Ducking Mixer
     bgm_mood = script_data.get("overall_bgm_mood", "epic_orchestral")
