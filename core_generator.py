@@ -598,21 +598,35 @@ def download_dalle3_image(prompt, output_path, is_shorts=True, api_key=None):
 
 
 def download_pollinations_image(prompt, output_path, is_shorts=True):
-    """Download a high-quality AI generated image from Pollinations.ai (Completely Free & No Key)."""
+    """Download a high-quality AI generated image from Pollinations.ai (Completely Free & No Key) with retries."""
     width = 1080 if is_shorts else 1920
     height = 1920 if is_shorts else 1080
     
-    safe_prompt = urllib.parse.quote(prompt)
-    url = f"https://image.pollinations.ai/prompt/{safe_prompt}?width={width}&height={height}&nologo=true&seed=42"
+    # Clean special characters from the prompt that might confuse the API
+    clean_prompt = prompt.replace(":", " ").replace("(", " ").replace(")", " ")
+    safe_prompt = urllib.parse.quote(clean_prompt)
     
-    try:
-        response = requests.get(url, timeout=20)
-        if response.status_code == 200:
-            with open(output_path, "wb") as f:
-                f.write(response.content)
-            return True
-    except Exception as e:
-        print(f"Pollinations Image Generation Failed: {e}")
+    import random
+    
+    max_retries = 3
+    for attempt in range(max_retries):
+        seed = random.randint(1, 100000)
+        url = f"https://image.pollinations.ai/prompt/{safe_prompt}?width={width}&height={height}&nologo=true&seed={seed}"
+        
+        try:
+            print(f"[Pollinations] Attempt {attempt+1}/{max_retries} for url: {url[:80]}...")
+            response = requests.get(url, timeout=40)
+            if response.status_code == 200:
+                with open(output_path, "wb") as f:
+                    f.write(response.content)
+                if os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
+                    print(f"[Pollinations] Success on attempt {attempt+1}!")
+                    return True
+        except Exception as e:
+            print(f"[Pollinations Warning] Attempt {attempt+1} failed: {e}")
+            
+        time.sleep(2)
+        
     return False
 
 
@@ -1030,10 +1044,52 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
     composite_clip = composite_clip.set_audio(scene_audio)
     composite_clip.fps = 24
     
-    # Strip mask to prevent MoviePy mask concatenation bugs that cause black screens in subsequent clips
-    composite_clip.mask = None
+    # Bake composite clip to intermediate file to resolve MoviePy nested timeline composition bugs fundamentally
+    scene_output_path = os.path.join(TEMP_DIR, f"scene_output_{scene_idx}.mp4")
+    temp_audio_path = os.path.join(TEMP_DIR, f"temp-scene-audio-{scene_idx}-{int(time.time())}.m4a")
     
-    return composite_clip
+    print(f"[Scene {scene_idx}] Baking composite clip to {scene_output_path}...")
+    composite_clip.write_videofile(
+        scene_output_path,
+        fps=24,
+        codec="libx264",
+        audio_codec="aac",
+        temp_audiofile=temp_audio_path,
+        remove_temp=False
+    )
+    
+    # Explicit resource cleanup to prevent Windows/Linux file locks and memory leaks
+    try:
+        composite_clip.close()
+    except Exception:
+        pass
+    try:
+        narr_clip.close()
+    except Exception:
+        pass
+    if 'visual_clip' in locals() and visual_clip is not None:
+        try:
+            visual_clip.close()
+        except Exception:
+            pass
+    if 'sub_clip' in locals() and sub_clip is not None:
+        try:
+            sub_clip.close()
+        except Exception:
+            pass
+    if 'avatar_clip' in locals() and avatar_clip is not None:
+        try:
+            avatar_clip.close()
+        except Exception:
+            pass
+    if 'sfx_clip' in locals() and 'sfx_clip' in globals() and sfx_clip is not None:
+        try:
+            sfx_clip.close()
+        except Exception:
+            pass
+            
+    baked_clip = VideoFileClip(scene_output_path)
+    return baked_clip, narr_duration
 
 
 def generate_full_video(topic, is_shorts=True, output_filename="final_output.mp4",
@@ -1069,7 +1125,7 @@ def generate_full_video(topic, is_shorts=True, output_filename="final_output.mp4
     for i, scene in enumerate(script_data["scenes"]):
         if progress_callback:
             progress_callback("SCENE", i, len(script_data["scenes"]))
-        clip = build_scene_video(
+        clip, narr_duration = build_scene_video(
             i, scene, is_shorts=is_shorts,
             tts_provider=tts_provider, tts_voice_id=tts_voice_id, tts_api_key=tts_api_key,
             image_provider=image_provider, fal_key=fal_key, openai_key=openai_key,
@@ -1079,7 +1135,6 @@ def generate_full_video(topic, is_shorts=True, output_filename="final_output.mp4
         scene_clips.append(clip)
         
         # Track scene narration timings for BGM ducking
-        narr_duration = clip.audio.clips[0].duration
         scene_duration = clip.duration
         
         scenes_timeline.append((current_time, current_time + narr_duration, current_time + scene_duration))
@@ -1190,11 +1245,16 @@ def generate_full_video(topic, is_shorts=True, output_filename="final_output.mp4
         remove_temp=False
     )
     
-    # Close clips to release files on Windows
+    # Close clips to release files on Windows/Linux and prevent file locking during cleanup
     try:
         final_clip.close()
     except Exception:
         pass
+    for c in scene_clips:
+        try:
+            c.close()
+        except Exception:
+            pass
         
     # 6. Cleanup temporary assets
     print("[Cleanup] Cleaning up temporary assets...")
