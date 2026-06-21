@@ -876,13 +876,14 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
                       tts_provider="edge", tts_voice_id=None, tts_api_key=None,
                       image_provider="pollinations", fal_key=None, openai_key=None,
                       target_size=None, video_skin="Option 1: 스틸컷 & Ken Burns 연출 (AI Image + Ken Burns)",
-                      pexels_key=None, topic="", content_skin="🎬 역사 다큐멘터리 (Historical Documentary)"):
+                      pexels_key=None, topic="", content_skin="🎬 역사 다큐멘터리 (Historical Documentary)",
+                      temp_dir="temp_assets"):
     """Render a single scene: merges narration audio, visuals based on selected technical skin, subtitles, and SFX."""
     print(f"[Scene {scene_idx}] Rendering scene with skin: {video_skin}...")
     
-    audio_path = os.path.join(TEMP_DIR, f"audio_{scene_idx}.mp3")
-    img_path = os.path.join(TEMP_DIR, f"visual_{scene_idx}.jpg")
-    subtitle_path = os.path.join(TEMP_DIR, f"sub_{scene_idx}.png")
+    audio_path = os.path.join(temp_dir, f"audio_{scene_idx}.mp3")
+    img_path = os.path.join(temp_dir, f"visual_{scene_idx}.jpg")
+    subtitle_path = os.path.join(temp_dir, f"sub_{scene_idx}.png")
     
     # Set narration pace rate dynamically based on content skin (historical/horror/fiction should be slow)
     is_slow_skin = "역사" in content_skin or "소설" in content_skin or "공포" in content_skin
@@ -905,7 +906,7 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
     
     if "Option 2" in video_skin: # AI Video Generation
         try:
-            video_clip_path = os.path.join(TEMP_DIR, f"video_{scene_idx}.mp4")
+            video_clip_path = os.path.join(temp_dir, f"video_{scene_idx}.mp4")
             prompt = scene_data.get("visual_prompt", "A dramatic cinematic scene")
             
             # Apply global visual style guidelines for AI video prompt
@@ -929,7 +930,7 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
             
     elif "Option 3" in video_skin: # Stock Video Matching
         try:
-            video_clip_path = os.path.join(TEMP_DIR, f"stock_{scene_idx}.mp4")
+            video_clip_path = os.path.join(temp_dir, f"stock_{scene_idx}.mp4")
             prompt = scene_data.get("visual_prompt", "")
             
             # Form search query from prompt descriptors
@@ -988,7 +989,7 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
     if "Option 4" in video_skin:
         try:
             presenter_prompt = "A professional neat news presenter avatar, close-up portrait, polite expression, front view, studio background, realistic photorealistic, 8k resolution"
-            presenter_img_path = os.path.join(TEMP_DIR, f"presenter_{scene_idx}.jpg")
+            presenter_img_path = os.path.join(temp_dir, f"presenter_{scene_idx}.jpg")
             generate_cinematic_image(presenter_prompt, presenter_img_path, is_shorts=True, provider=image_provider, fal_key=fal_key, openai_key=openai_key)
             
             avatar_path = make_circular_avatar(presenter_img_path, size=260)
@@ -1045,8 +1046,8 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
     composite_clip.fps = 24
     
     # Bake composite clip to intermediate file to resolve MoviePy nested timeline composition bugs fundamentally
-    scene_output_path = os.path.join(TEMP_DIR, f"scene_output_{scene_idx}.mp4")
-    temp_audio_path = os.path.join(TEMP_DIR, f"temp-scene-audio-{scene_idx}-{int(time.time())}.m4a")
+    scene_output_path = os.path.join(temp_dir, f"scene_output_{scene_idx}.mp4")
+    temp_audio_path = os.path.join(temp_dir, f"temp-scene-audio-{scene_idx}-{int(time.time())}.m4a")
     
     print(f"[Scene {scene_idx}] Baking composite clip to {scene_output_path}...")
     composite_clip.write_videofile(
@@ -1099,9 +1100,16 @@ def generate_full_video(topic, is_shorts=True, output_filename="final_output.mp4
                         character_desc="", visual_style="",
                         content_skin="🎬 역사 다큐멘터리 (Historical Documentary)",
                         video_skin="Option 1: 스틸컷 & Ken Burns 연출 (AI Image + Ken Burns)",
-                        pexels_key=None, progress_callback=None):
+                        pexels_key=None, progress_callback=None,
+                        temp_dir=None):
     """Entire video pipeline from scripting to final video composition with chosen technical skin."""
     print(f"[Start] Starting Cinematic AI Video Factory Pipeline with technical skin: {video_skin}...")
+    
+    # Create unique temp assets folder if not specified to prevent race condition in multi-user environments
+    import uuid
+    if temp_dir is None:
+        temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"temp_assets_{int(time.time())}_{uuid.uuid4().hex[:8]}")
+    os.makedirs(temp_dir, exist_ok=True)
     
     if progress_callback:
         progress_callback("PREPARE")
@@ -1130,7 +1138,7 @@ def generate_full_video(topic, is_shorts=True, output_filename="final_output.mp4
             tts_provider=tts_provider, tts_voice_id=tts_voice_id, tts_api_key=tts_api_key,
             image_provider=image_provider, fal_key=fal_key, openai_key=openai_key,
             target_size=target_size, video_skin=video_skin, pexels_key=pexels_key,
-            topic=topic, content_skin=content_skin
+            topic=topic, content_skin=content_skin, temp_dir=temp_dir
         )
         scene_clips.append(clip)
         
@@ -1234,8 +1242,8 @@ def generate_full_video(topic, is_shorts=True, output_filename="final_output.mp4
     if progress_callback:
         progress_callback("RENDER")
     print(f"[Render] Rendering final output video: {output_filename}...")
-    # Use unique temp audio file path in TEMP_DIR and disable MoviePy automatic deletion to prevent Windows file lock crashes
-    temp_audio_path = os.path.join(TEMP_DIR, f"temp-audio-{int(time.time())}.m4a")
+    # Use unique temp audio file path in temp_dir and disable MoviePy automatic deletion to prevent Windows file lock crashes
+    temp_audio_path = os.path.join(temp_dir, f"temp-audio-{int(time.time())}.m4a")
     final_clip.write_videofile(
         output_filename,
         fps=24,
@@ -1256,13 +1264,13 @@ def generate_full_video(topic, is_shorts=True, output_filename="final_output.mp4
         except Exception:
             pass
         
-    # 6. Cleanup temporary assets
-    print("[Cleanup] Cleaning up temporary assets...")
-    for file in os.listdir(TEMP_DIR):
-        try:
-            os.remove(os.path.join(TEMP_DIR, file))
-        except Exception:
-            pass
+    # 6. Cleanup temporary assets directory completely to release disk space in multi-user/server setups
+    print(f"[Cleanup] Cleaning up temporary assets directory: {temp_dir}...")
+    import shutil
+    try:
+        shutil.rmtree(temp_dir)
+    except Exception as e:
+        print(f"[Cleanup Warning] Failed to delete temp directory {temp_dir}: {e}")
             
     if progress_callback:
         progress_callback("DONE")

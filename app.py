@@ -72,6 +72,27 @@ st.markdown("""
 # Force load environment variables
 load_dotenv()
 
+def cleanup_old_files(max_age_seconds=600):
+    """Scan root directory and clean up dynamic output render/thumbnail files older than 10 minutes."""
+    import time
+    current_time = time.time()
+    for f in os.listdir("."):
+        if os.path.isfile(f):
+            is_render = (
+                f.startswith("final_output_") or 
+                f.startswith("output_render_") or 
+                f.startswith("thumbnail_output_") or 
+                f.startswith("v2_output_") or 
+                f.startswith("v1_output_")
+            )
+            if is_render:
+                try:
+                    file_age = current_time - os.path.getmtime(f)
+                    if file_age > max_age_seconds:
+                        os.remove(f)
+                except Exception:
+                    pass
+
 # Load environment keys quietly for fallback
 gemini_key = os.getenv("GEMINI_API_KEY", "")
 elevenlabs_key = os.getenv("ELEVENLABS_API_KEY", "")
@@ -748,7 +769,16 @@ if "v3.0.0" in selected_version:
                 if active_pexels_key:
                     os.environ["PEXELS_API_KEY"] = active_pexels_key
 
-                output_filename = "final_output.mp4"
+                # Run background cleanup of old dynamic files (older than 10 mins)
+                cleanup_old_files()
+                
+                import uuid
+                timestamp = int(time.time())
+                unique_id = uuid.uuid4().hex[:8]
+                
+                # Make dynamic uniquely isolatable names for temp dir and outputs
+                temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"temp_assets_{timestamp}_{unique_id}")
+                output_filename = f"final_output_{timestamp}_{unique_id}.mp4"
                 
                 video_path, script_data = core_generator.generate_full_video(
                     st.session_state.topic, 
@@ -765,26 +795,34 @@ if "v3.0.0" in selected_version:
                     content_skin=st.session_state.content_genre,
                     video_skin=st.session_state.video_skin,
                     pexels_key=active_pexels_key,
-                    progress_callback=cb
+                    progress_callback=cb,
+                    temp_dir=temp_dir
                 )
                 
-                stable_video_path = "output_render.mp4"
+                stable_video_path = f"output_render_{timestamp}_{unique_id}.mp4"
                 shutil.copy(video_path, stable_video_path)
                 st.session_state.final_video_path = stable_video_path
                 
+                # Clean up the initial raw render filename to keep directory clean
+                try:
+                    os.remove(output_filename)
+                except Exception:
+                    pass
+                
                 cb("RENDER")  # Update to final render (Thumbnails & Packaging)
-                thumbnail_path = "thumbnail_output.png"
+                thumbnail_path = f"thumbnail_output_{timestamp}_{unique_id}.png"
+                temp_thumb_bg_path = f"temp_thumb_bg_{timestamp}_{unique_id}.jpg"
                 
                 core_generator.generate_cinematic_image(
                     f"A dramatic and historical scene representing {st.session_state.topic}, digital art, masterpiece, realistic, cinematic lighting",
-                    "temp_thumb_bg.jpg",
+                    temp_thumb_bg_path,
                     is_shorts=False,
                     provider=st.session_state.image_provider,
                     fal_key=active_fal_key,
                     openai_key=active_openai_key
                 )
                 
-                thumb_bg = Image.open("temp_thumb_bg.jpg")
+                thumb_bg = Image.open(temp_thumb_bg_path)
                 thumb_bg = thumb_bg.resize((1280, 720))
                 draw = ImageDraw.Draw(thumb_bg)
                 font = core_generator.get_system_font(font_size=80)
@@ -811,7 +849,7 @@ if "v3.0.0" in selected_version:
                 st.session_state.thumbnail_path = thumbnail_path
                 
                 try:
-                    os.remove("temp_thumb_bg.jpg")
+                    os.remove(temp_thumb_bg_path)
                 except Exception:
                     pass
                     
@@ -1194,10 +1232,18 @@ elif "v2.0.0" in selected_version:
                     if active_pexels_key:
                         os.environ["PEXELS_API_KEY"] = active_pexels_key
 
+                    cleanup_old_files()
+                    import uuid
+                    timestamp = int(time.time())
+                    unique_id = uuid.uuid4().hex[:8]
+                    
+                    temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"temp_assets_{timestamp}_{unique_id}")
+                    v2_raw_filename = f"v2_raw_{timestamp}_{unique_id}.mp4"
+                    
                     video_path, script_data = core_generator.generate_full_video(
                         st.session_state.topic, 
                         is_shorts=st.session_state.is_shorts, 
-                        output_filename="v2_output.mp4",
+                        output_filename=v2_raw_filename,
                         tts_provider=st.session_state.tts_provider,
                         tts_voice_id=st.session_state.tts_voice_id,
                         tts_api_key=active_eleven_key,
@@ -1208,10 +1254,18 @@ elif "v2.0.0" in selected_version:
                         target_size=st.session_state.target_size,
                         content_skin=st.session_state.content_genre,
                         video_skin=st.session_state.video_skin,
-                        pexels_key=active_pexels_key
+                        pexels_key=active_pexels_key,
+                        temp_dir=temp_dir
                     )
-                    st.session_state.final_video_path = "v2_output.mp4"
-                    shutil.copy(video_path, "v2_output.mp4")
+                    stable_video_path = f"v2_output_{timestamp}_{unique_id}.mp4"
+                    shutil.copy(video_path, stable_video_path)
+                    st.session_state.final_video_path = stable_video_path
+                    
+                    try:
+                        os.remove(v2_raw_filename)
+                    except Exception:
+                        pass
+                        
                     st.session_state.step = "result"
                     st.rerun()
                 except Exception as e:
@@ -1352,10 +1406,18 @@ else:
                 if active_pexels_key:
                     os.environ["PEXELS_API_KEY"] = active_pexels_key
 
+                cleanup_old_files()
+                import uuid
+                timestamp = int(time.time())
+                unique_id = uuid.uuid4().hex[:8]
+                
+                temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"temp_assets_{timestamp}_{unique_id}")
+                v1_raw_filename = f"v1_raw_{timestamp}_{unique_id}.mp4"
+                
                 video_path, script_data = core_generator.generate_full_video(
                     st.session_state.topic, 
                     is_shorts=st.session_state.is_shorts, 
-                    output_filename="v1_output.mp4",
+                    output_filename=v1_raw_filename,
                     tts_provider=st.session_state.tts_provider,
                     tts_voice_id=st.session_state.tts_voice_id,
                     tts_api_key=active_eleven_key,
@@ -1366,10 +1428,18 @@ else:
                     target_size=st.session_state.target_size,
                     content_skin="🎬 역사 다큐멘터리 (Historical Documentary)",
                     video_skin="Option 1: 스틸컷 & Ken Burns 연출 (AI Image + Ken Burns)",
-                    pexels_key=active_pexels_key
+                    pexels_key=active_pexels_key,
+                    temp_dir=temp_dir
                 )
-                st.session_state.final_video_path = "v1_output.mp4"
-                shutil.copy(video_path, "v1_output.mp4")
+                stable_video_path = f"v1_output_{timestamp}_{unique_id}.mp4"
+                shutil.copy(video_path, stable_video_path)
+                st.session_state.final_video_path = stable_video_path
+                
+                try:
+                    os.remove(v1_raw_filename)
+                except Exception:
+                    pass
+                    
                 st.session_state.step = "result"
                 st.rerun()
             except Exception as e:
