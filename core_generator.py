@@ -344,8 +344,8 @@ def generate_tts(text, output_path, voice="ko-KR-InJoonNeural", rate="-12%"):
     asyncio.run(generate_tts_async(text, output_path, voice, rate=rate))
 
 
-def generate_elevenlabs_tts(text, output_path, voice_id="pNInz6obpgq5mWzIA5FD", api_key=None):
-    """Synthesize speech using ElevenLabs REST API."""
+def generate_elevenlabs_tts(text, output_path, voice_id="pNInz6obpgq5mWzIA5FD", api_key=None, stability=0.75, clarity=0.75, style=0.0):
+    """Synthesize speech using ElevenLabs REST API with detailed parameter tuning."""
     if not api_key or api_key == "your_elevenlabs_api_key_here" or api_key.strip() == "":
         raise ValueError("ElevenLabs API Key is missing or invalid.")
         
@@ -359,8 +359,9 @@ def generate_elevenlabs_tts(text, output_path, voice_id="pNInz6obpgq5mWzIA5FD", 
         "text": text,
         "model_id": "eleven_multilingual_v2",
         "voice_settings": {
-            "stability": 0.5,
-            "similarity_boost": 0.75
+            "stability": stability,
+            "similarity_boost": clarity,
+            "style": style
         }
     }
     response = requests.post(url, json=data, headers=headers, timeout=30)
@@ -372,20 +373,102 @@ def generate_elevenlabs_tts(text, output_path, voice_id="pNInz6obpgq5mWzIA5FD", 
         raise Exception(f"ElevenLabs TTS failed: Status {response.status_code}, {response.text}")
 
 
-def generate_voice_over(text, output_path, provider="edge", voice_id=None, api_key=None, rate="-12%"):
+def generate_google_tts(text, output_path, voice_name="ko-KR-Neural2-A", api_key=None, rate="-12%"):
+    """Synthesize speech using Google Cloud Text-to-Speech REST API."""
+    k = api_key or os.getenv("GEMINI_API_KEY")
+    if not k:
+        raise ValueError("Google API key is missing for TTS.")
+        
+    url = f"https://texttospeech.googleapis.com/v1/text:synthesize?key={k}"
+    headers = {"Content-Type": "application/json"}
+    
+    # Map friendly names to actual API voice codes
+    voice_map = {
+        "ko-KR-Neural2-A (남성 - 표준)": "ko-KR-Neural2-A",
+        "ko-KR-Neural2-B (여성 - 표준)": "ko-KR-Neural2-B",
+        "ko-KR-Wavenet-A (남성 - 중후함)": "ko-KR-Wavenet-A",
+        "ko-KR-Journey-F (여성 - 친근함)": "ko-KR-Journey-F",
+        "ko-KR-Studio-O (남성 - 뉴스 성우)": "ko-KR-Studio-O"
+    }
+    
+    actual_voice = voice_map.get(voice_name, voice_name)
+    if not actual_voice:
+        actual_voice = "ko-KR-Neural2-A"
+        
+    # Determine language code
+    lang_code = "ko-KR"
+    parts = actual_voice.split("-")
+    if len(parts) >= 2:
+        lang_code = f"{parts[0]}-{parts[1]}"
+        
+    # Convert rate to float speakingRate (1.0 is normal, 0.88 is -12% slow)
+    float_rate = 1.0
+    if isinstance(rate, str) and rate.endswith("%"):
+        try:
+            percent = float(rate.replace("%", ""))
+            float_rate = 1.0 + (percent / 100.0)
+        except Exception:
+            float_rate = 0.88
+    else:
+        try:
+            float_rate = float(rate)
+        except Exception:
+            float_rate = 0.88
+            
+    payload = {
+        "input": {"text": text},
+        "voice": {
+            "languageCode": lang_code,
+            "name": actual_voice
+        },
+        "audioConfig": {
+            "audioEncoding": "MP3",
+            "speakingRate": float_rate
+        }
+    }
+    
+    print(f"[Google TTS] Generating voiceover for '{text[:25]}...' using voice {actual_voice} at speed {float_rate}...")
+    response = requests.post(url, json=payload, headers=headers, timeout=20)
+    if response.status_code == 200:
+        import base64
+        audio_content = response.json().get("audioContent")
+        if audio_content:
+            audio_bytes = base64.b64decode(audio_content)
+            with open(output_path, "wb") as f:
+                f.write(audio_bytes)
+            return True
+        else:
+            raise Exception("Google TTS response did not contain audioContent.")
+    else:
+        raise Exception(f"Google TTS synthesis failed: Status {response.status_code}, {response.text}")
+
+
+def generate_voice_over(text, output_path, provider="edge", voice_id=None, api_key=None, rate="-12%",
+                        v4_voice_stability=0.75, v4_voice_clarity=0.75, v4_voice_style=0.0):
     """Synthesize speech with selected provider and fallback to edge-tts if it fails."""
-    if provider == "elevenlabs":
+    if provider == "google":
+        try:
+            print(f"[TTS] Attempting Google Cloud TTS with voice {voice_id}...")
+            v_id = voice_id if voice_id and "-" in voice_id else "ko-KR-Neural2-A"
+            generate_google_tts(text, output_path, voice_name=v_id, api_key=api_key, rate=rate)
+            print("[TTS] Google Cloud TTS succeeded!")
+            return "google"
+        except Exception as e:
+            print(f"[TTS Warning] Google Cloud TTS failed: {e}. Falling back to Microsoft Edge TTS...")
+            
+    elif provider == "elevenlabs":
         try:
             print(f"[TTS] Attempting ElevenLabs TTS with voice {voice_id}...")
             vid = voice_id if voice_id else "pNInz6obpgq5mWzIA5FD"
-            generate_elevenlabs_tts(text, output_path, voice_id=vid, api_key=api_key)
+            generate_elevenlabs_tts(text, output_path, voice_id=vid, api_key=api_key,
+                                    stability=v4_voice_stability, clarity=v4_voice_clarity, style=v4_voice_style)
             print("[TTS] ElevenLabs TTS succeeded!")
             return "elevenlabs"
         except Exception as e:
             print(f"[TTS Warning] ElevenLabs TTS failed: {e}. Falling back to Microsoft Edge TTS...")
             
     # Default to Edge-TTS
-    edge_voice = voice_id if voice_id and voice_id.startswith("ko-KR") else "ko-KR-InJoonNeural"
+    edge_voice = voice_id if voice_id and voice_id.startswith("ko-KR") and "Neural" in voice_id else "ko-KR-InJoonNeural"
     generate_tts(text, output_path, voice=edge_voice, rate=rate)
     print(f"[TTS] Microsoft Edge TTS ({edge_voice}) succeeded!")
     return "edge"
@@ -630,11 +713,18 @@ def download_pollinations_image(prompt, output_path, is_shorts=True):
     return False
 
 
-def generate_cinematic_image(prompt, output_path, is_shorts=True, provider="pollinations", fal_key=None, openai_key=None):
+def generate_cinematic_image(prompt, output_path, is_shorts=True, provider="pollinations", fal_key=None, openai_key=None, gemini_key=None):
     """Download or generate high-quality images with selection of provider and robust fallback to Pollinations."""
     success = False
     
-    if provider == "fal-ai":
+    if provider == "google":
+        try:
+            aspect_ratio = "9:16" if is_shorts else "16:9"
+            success = download_imagen_image(prompt, output_path, aspect_ratio=aspect_ratio, api_key=gemini_key)
+        except Exception as e:
+            print(f"[Image Warning] Google Imagen 3 generation failed: {e}. Falling back to Pollinations...")
+            
+    elif provider == "fal-ai":
         try:
             success = download_fal_ai_image(prompt, output_path, is_shorts, api_key=fal_key)
         except Exception as e:
@@ -662,8 +752,8 @@ def generate_cinematic_image(prompt, output_path, is_shorts=True, provider="poll
     return success
 
 
-def make_ken_burns_clip(image_path, duration, target_size=(1080, 1920), movement_type="zoom_in", speed="slow"):
-    """Creates a VideoClip of an image with Ken Burns camera effect (zoom/pan)."""
+def make_ken_burns_clip(image_path, duration, target_size=(1080, 1920), movement_type="zoom_in", speed="slow", easing="Linear"):
+    """Creates a VideoClip of an image with Ken Burns camera effect (zoom/pan) using advanced easing curves."""
     img = Image.open(image_path).convert("RGB")
     w_orig, h_orig = img.size
     w_target, h_target = target_size
@@ -680,10 +770,24 @@ def make_ken_burns_clip(image_path, duration, target_size=(1080, 1920), movement
         p = t / duration if duration > 0 else 0
         p = min(1.0, max(0.0, p))
         
+        # Apply easing function to interpolation value
+        if "Cubic" in easing:
+            # Cubic Ease-in-out: starts slow, speeds up in middle, ends slow
+            if p < 0.5:
+                p_eased = 4 * p * p * p
+            else:
+                p_eased = 1 - (-2 * p + 2)**3 / 2
+        elif "Quadratic" in easing:
+            # Quadratic Ease-out: starts fast, slows down at the end
+            p_eased = 1 - (1 - p) * (1 - p)
+        else:
+            # Linear: constant speed
+            p_eased = p
+            
         if movement_type == "zoom_in":
-            scale = max_scale - (max_scale - 1.0) * p
+            scale = max_scale - (max_scale - 1.0) * p_eased
         elif movement_type == "zoom_out":
-            scale = 1.0 + (max_scale - 1.0) * p
+            scale = 1.0 + (max_scale - 1.0) * p_eased
         else:
             scale = 1.10
             
@@ -697,13 +801,13 @@ def make_ken_burns_clip(image_path, duration, target_size=(1080, 1920), movement
         max_shift_y = (h_large - h_box) / 2
         
         if movement_type == "pan_left":
-            cx = (w_large / 2) - max_shift_x + (2 * max_shift_x * p)
+            cx = (w_large / 2) - max_shift_x + (2 * max_shift_x * p_eased)
         elif movement_type == "pan_right":
-            cx = (w_large / 2) + max_shift_x - (2 * max_shift_x * p)
+            cx = (w_large / 2) + max_shift_x - (2 * max_shift_x * p_eased)
         elif movement_type == "pan_up":
-            cy = (h_large / 2) - max_shift_y + (2 * max_shift_y * p)
+            cy = (h_large / 2) - max_shift_y + (2 * max_shift_y * p_eased)
         elif movement_type == "pan_down":
-            cy = (h_large / 2) + max_shift_y - (2 * max_shift_y * p)
+            cy = (h_large / 2) + max_shift_y - (2 * max_shift_y * p_eased)
             
         x0 = int(cx - w_box / 2)
         y0 = int(cy - h_box / 2)
@@ -872,14 +976,224 @@ def make_circular_avatar(image_path, size=240):
     return out_path
 
 
+def add_film_grain_filter(clip, intensity=15):
+    """Applies a dynamic film grain filter to a clip using integer-based random noise."""
+    if intensity <= 0:
+        return clip
+    
+    def filter_func(image):
+        h, w, c = image.shape
+        max_noise = max(1, int(intensity * 0.25))
+        noise = np.random.randint(-max_noise, max_noise + 1, (h, w, c), dtype=np.int16)
+        noisy = image.astype(np.int16) + noise
+        return np.clip(noisy, 0, 255).astype(np.uint8)
+        
+    return clip.fl_image(filter_func)
+
+
+def add_vignette_filter(clip):
+    """Applies a dark cinematic vignette effect to the edges of the video."""
+    h, w = clip.size[1], clip.size[0]
+    
+    y = np.linspace(-1.0, 1.0, h)
+    x = np.linspace(-1.0, 1.0, w)
+    xx, yy = np.meshgrid(x, y)
+    d = xx**2 + yy**2
+    
+    mask = 1.0 - 0.40 * np.minimum(1.0, d)
+    mask = mask[:, :, np.newaxis]
+    
+    def filter_func(image):
+        return (image.astype(np.float32) * mask).astype(np.uint8)
+        
+    return clip.fl_image(filter_func)
+
+
+def apply_stereo_panning(audio_clip, duration, direction="left_to_right"):
+    """Applies stereo panning to an audio clip over its duration using sin/cos power preservation."""
+    def pan_filter(gf, t):
+        frames = gf(t)
+        
+        if isinstance(t, np.ndarray):
+            p = t / duration
+            p = np.clip(p, 0.0, 1.0)
+            if direction == "right_to_left":
+                p = 1.0 - p
+            
+            p = p[:, np.newaxis]
+            
+            if len(frames.shape) == 1:
+                frames = np.column_stack((frames, frames))
+            elif frames.shape[1] == 1:
+                frames = np.hstack((frames, frames))
+                
+            left_vol = np.cos(p * np.pi / 2)
+            right_vol = np.sin(p * np.pi / 2)
+            
+            panned = np.zeros_like(frames)
+            panned[:, 0] = frames[:, 0] * left_vol[:, 0]
+            panned[:, 1] = frames[:, 1] * right_vol[:, 0]
+            return panned
+        else:
+            p = t / duration
+            p = min(1.0, max(0.0, p))
+            if direction == "right_to_left":
+                p = 1.0 - p
+                
+            left_vol = np.cos(p * np.pi / 2)
+            right_vol = np.sin(p * np.pi / 2)
+            
+            if len(frames.shape) == 0:
+                frames = np.array([frames, frames])
+            elif len(frames.shape) == 1 and frames.shape[0] == 1:
+                frames = np.array([frames[0], frames[0]])
+            elif len(frames.shape) == 1 and frames.shape[0] == 2:
+                pass
+            else:
+                frames = np.column_stack((frames, frames))
+                
+            panned = np.array([frames[0] * left_vol, frames[1] * right_vol])
+            return panned
+            
+    return audio_clip.fl(pan_filter)
+
+
+def apply_compressor_filter(audio_clip, threshold=0.15, ratio=4.0, makeup_gain=1.3):
+    """Applies a dynamic range compressor/limiter to the audio clip to make dialogue punchy and professional."""
+    def compressor(gf, t):
+        frames = gf(t)
+        abs_frames = np.abs(frames)
+        mask = abs_frames > threshold
+        compressed = np.copy(frames)
+        
+        if np.any(mask):
+            excess = abs_frames[mask] - threshold
+            compressed_excess = threshold + excess / ratio
+            scale = compressed_excess / abs_frames[mask]
+            compressed[mask] = frames[mask] * scale
+            
+        compressed = compressed * makeup_gain
+        return np.clip(compressed, -0.99, 0.99)
+        
+    return audio_clip.fl(compressor)
+
+
+def download_imagen_image(prompt, output_path, aspect_ratio="9:16", api_key=None):
+    """Generate an image using Vertex AI / Google GenAI SDK Imagen 3 model."""
+    from google import genai
+    
+    k = api_key or os.getenv("GEMINI_API_KEY")
+    if not k:
+        raise ValueError("Google API key (GEMINI_API_KEY) is required for Imagen 3.")
+        
+    client = genai.Client(api_key=k)
+    
+    ratio = "9:16"
+    if "16:9" in aspect_ratio:
+        ratio = "16:9"
+    elif "1:1" in aspect_ratio:
+        ratio = "1:1"
+        
+    print(f"[Imagen 3] Requesting image (ratio: {ratio}) for: {prompt[:50]}...")
+    
+    result = client.models.generate_images(
+        model='imagen-3.0-generate-002',
+        prompt=prompt,
+        config=dict(
+            number_of_images=1,
+            output_mime_type="image/jpeg",
+            aspect_ratio=ratio,
+        )
+    )
+    
+    if result.generated_images:
+        img_bytes = result.generated_images[0].image.image_bytes
+        with open(output_path, "wb") as f:
+            f.write(img_bytes)
+        print("[Imagen 3] Image generated successfully!")
+        return True
+    else:
+        raise Exception("Imagen 3 API did not return any generated images.")
+
+
+def upload_file_to_gcs(local_path, bucket_name, destination_blob_name):
+    """Uploads a file to Google Cloud Storage bucket."""
+    try:
+        from google.cloud import storage
+        print(f"[GCS] Uploading {local_path} to bucket '{bucket_name}' as '{destination_blob_name}'...")
+        
+        storage_client = storage.Client()
+        bucket = storage_client.bucket(bucket_name)
+        blob = bucket.blob(destination_blob_name)
+        
+        blob.upload_from_filename(local_path)
+        url = blob.public_url
+        print(f"[GCS] Upload succeeded! public_url: {url}")
+        return url
+    except Exception as e:
+        print(f"[GCS Warning] Failed to upload to GCS: {e}")
+        return None
+
+
+def fetch_script_from_google_sheets(sheet_id):
+    """Fetches script scenes from a public or link-shared Google Spreadsheet."""
+    import csv
+    import io
+    url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
+    print(f"[Google Sheets] Fetching sheet from export URL: {url}")
+    response = requests.get(url, timeout=15)
+    if response.status_code != 200:
+        raise Exception(f"Failed to fetch Google Sheet: Status {response.status_code}")
+    
+    csv_file = io.StringIO(response.text)
+    reader = csv.DictReader(csv_file)
+    
+    scenes = []
+    for row in reader:
+        norm_row = {k.lower().strip(): v for k, v in row.items()}
+        
+        narration = norm_row.get("narration") or norm_row.get("text") or norm_row.get("대사") or ""
+        visual_prompt = norm_row.get("visual_prompt") or norm_row.get("prompt") or norm_row.get("이미지프롬프트") or ""
+        
+        if not narration and not visual_prompt:
+            continue
+            
+        camera_type = norm_row.get("camera_movement") or norm_row.get("camera") or "zoom_in"
+        camera_speed = norm_row.get("camera_speed") or "slow"
+        sfx_trigger = norm_row.get("sfx_trigger") or norm_row.get("sfx") or "none"
+        sfx_timing = norm_row.get("sfx_timing") or "start"
+        
+        scenes.append({
+            "narration": narration.strip(),
+            "visual_prompt": visual_prompt.strip(),
+            "camera_movement": {"type": camera_type.strip(), "speed": camera_speed.strip()},
+            "sfx_trigger": sfx_trigger.strip(),
+            "sfx_timing": sfx_timing.strip()
+        })
+        
+    if not scenes:
+        raise Exception("No valid rows containing 'narration' or 'visual_prompt' columns found in Sheet.")
+        
+    return {
+        "title": "Google Sheets AI Video Script",
+        "description": "Generated automatically from Google Sheets",
+        "tags": ["sheets_auto", "ai_video"],
+        "overall_bgm_mood": "epic_orchestral",
+        "scenes": scenes
+    }
+
+
 def build_scene_video(scene_idx, scene_data, is_shorts=True, 
                       tts_provider="edge", tts_voice_id=None, tts_api_key=None,
                       image_provider="pollinations", fal_key=None, openai_key=None,
                       target_size=None, video_skin="Option 1: 스틸컷 & Ken Burns 연출 (AI Image + Ken Burns)",
                       pexels_key=None, topic="", content_skin="🎬 역사 다큐멘터리 (Historical Documentary)",
-                      temp_dir="temp_assets"):
+                      temp_dir="temp_assets",
+                      v4_easing="Linear", v4_3d_panning=False,
+                      v4_voice_stability=0.75, v4_voice_clarity=0.75, v4_voice_style=0.0,
+                      gemini_key=None):
     """Render a single scene: merges narration audio, visuals based on selected technical skin, subtitles, and SFX."""
-    print(f"[Scene {scene_idx}] Rendering scene with skin: {video_skin}...")
+    print(f"[Scene {scene_idx}] Rendering scene with skin: {video_skin} (Easing: {v4_easing}, Panning: {v4_3d_panning})...")
     
     audio_path = os.path.join(temp_dir, f"audio_{scene_idx}.mp3")
     img_path = os.path.join(temp_dir, f"visual_{scene_idx}.jpg")
@@ -890,7 +1204,11 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
     tts_rate = "-12%" if is_slow_skin else "-2%"
     
     # 1. Synthesize narration
-    generate_voice_over(scene_data["narration"], audio_path, provider=tts_provider, voice_id=tts_voice_id, api_key=tts_api_key, rate=tts_rate)
+    generate_voice_over(
+        scene_data["narration"], audio_path, 
+        provider=tts_provider, voice_id=tts_voice_id, api_key=tts_api_key, rate=tts_rate,
+        v4_voice_stability=v4_voice_stability, v4_voice_clarity=v4_voice_clarity, v4_voice_style=v4_voice_style
+    )
     narr_clip = AudioFileClip(audio_path)
     narr_duration = narr_clip.duration
     
@@ -954,8 +1272,8 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
     elif "Option 5" in video_skin: # Typography (Abstract background)
         # Generate abstract background image
         bg_prompt = "Abstract elegant liquid gradient background, smooth dark colors, high resolution, minimalist"
-        generate_cinematic_image(bg_prompt, img_path, is_shorts=is_shorts, provider=image_provider, fal_key=fal_key, openai_key=openai_key)
-        visual_clip = make_ken_burns_clip(img_path, scene_duration, target_size=target_size, movement_type="zoom_in", speed="slow")
+        generate_cinematic_image(bg_prompt, img_path, is_shorts=is_shorts, provider=image_provider, fal_key=fal_key, openai_key=openai_key, gemini_key=gemini_key)
+        visual_clip = make_ken_burns_clip(img_path, scene_duration, target_size=target_size, movement_type="zoom_in", speed="slow", easing=v4_easing)
         
     # Default fallback / Option 1 / Option 4 background
     if visual_clip is None:
@@ -969,12 +1287,12 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
         elif "소설" in content_skin:
             prompt = f"Fantasy watercolor illustration, soft dreamlike warm light, pastel color palette, emotional scenery, {prompt}, masterpiece, highly detailed, fairytale aesthetic"
             
-        generate_cinematic_image(prompt, img_path, is_shorts=is_shorts, provider=image_provider, fal_key=fal_key, openai_key=openai_key)
+        generate_cinematic_image(prompt, img_path, is_shorts=is_shorts, provider=image_provider, fal_key=fal_key, openai_key=openai_key, gemini_key=gemini_key)
         
         cam_info = scene_data.get("camera_movement", {})
         cam_type = cam_info.get("type", "zoom_in")
         cam_speed = cam_info.get("speed", "slow")
-        visual_clip = make_ken_burns_clip(img_path, scene_duration, target_size=target_size, movement_type=cam_type, speed=cam_speed)
+        visual_clip = make_ken_burns_clip(img_path, scene_duration, target_size=target_size, movement_type=cam_type, speed=cam_speed, easing=v4_easing)
         
     # 3. Create Subtitle Overlay
     # Option 5 places subtitle in center
@@ -990,7 +1308,7 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
         try:
             presenter_prompt = "A professional neat news presenter avatar, close-up portrait, polite expression, front view, studio background, realistic photorealistic, 8k resolution"
             presenter_img_path = os.path.join(temp_dir, f"presenter_{scene_idx}.jpg")
-            generate_cinematic_image(presenter_prompt, presenter_img_path, is_shorts=True, provider=image_provider, fal_key=fal_key, openai_key=openai_key)
+            generate_cinematic_image(presenter_prompt, presenter_img_path, is_shorts=True, provider=image_provider, fal_key=fal_key, openai_key=openai_key, gemini_key=gemini_key)
             
             avatar_path = make_circular_avatar(presenter_img_path, size=260)
             raw_avatar_clip = ImageClip(avatar_path).set_duration(scene_duration)
@@ -1026,6 +1344,12 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
                 sfx_clip = AudioFileClip(sfx_file).volumex(0.35) # 35% volume for SFX
                 sfx_dur = min(sfx_clip.duration, scene_duration)
                 sfx_clip = sfx_clip.subclip(0, sfx_dur)
+                
+                # Apply 3D stereo panning if enabled
+                if v4_3d_panning:
+                    direction = "right_to_left" if "left" in cam_type or "out" in cam_type else "left_to_right"
+                    sfx_clip = apply_stereo_panning(sfx_clip, sfx_dur, direction=direction)
+                    print(f"[Scene {scene_idx}] Applied stereo panning ({direction}) to SFX '{sfx_trigger}'")
                 
                 # Determine placement time
                 if sfx_timing == "start":
@@ -1101,7 +1425,11 @@ def generate_full_video(topic, is_shorts=True, output_filename="final_output.mp4
                         content_skin="🎬 역사 다큐멘터리 (Historical Documentary)",
                         video_skin="Option 1: 스틸컷 & Ken Burns 연출 (AI Image + Ken Burns)",
                         pexels_key=None, progress_callback=None,
-                        temp_dir=None):
+                        temp_dir=None,
+                        v4_easing="Linear", v4_film_grain=0, v4_vignette=False,
+                        v4_3d_panning=False, v4_compressor=False,
+                        v4_voice_stability=0.75, v4_voice_clarity=0.75, v4_voice_style=0.0,
+                        v5_gcs_bucket=""):
     """Entire video pipeline from scripting to final video composition with chosen technical skin."""
     print(f"[Start] Starting Cinematic AI Video Factory Pipeline with technical skin: {video_skin}...")
     
@@ -1138,7 +1466,10 @@ def generate_full_video(topic, is_shorts=True, output_filename="final_output.mp4
             tts_provider=tts_provider, tts_voice_id=tts_voice_id, tts_api_key=tts_api_key,
             image_provider=image_provider, fal_key=fal_key, openai_key=openai_key,
             target_size=target_size, video_skin=video_skin, pexels_key=pexels_key,
-            topic=topic, content_skin=content_skin, temp_dir=temp_dir
+            topic=topic, content_skin=content_skin, temp_dir=temp_dir,
+            v4_easing=v4_easing, v4_3d_panning=v4_3d_panning,
+            v4_voice_stability=v4_voice_stability, v4_voice_clarity=v4_voice_clarity, v4_voice_style=v4_voice_style,
+            gemini_key=os.getenv("GEMINI_API_KEY")
         )
         scene_clips.append(clip)
         
@@ -1164,6 +1495,15 @@ def generate_full_video(topic, is_shorts=True, output_filename="final_output.mp4
     # This completely bypasses the nested timeline mapping bug. Since all our clips are strictly resized to the
     # target size and set to 24 FPS, method="chain" is clean, robust, and extremely fast.
     final_clip = concatenate_videoclips(aligned_clips, method="chain")
+    
+    # Apply post-processing visual filters
+    if v4_vignette:
+        print("[Video Vignette] Applying master vignette filter to final clip...")
+        final_clip = add_vignette_filter(final_clip)
+        
+    if v4_film_grain > 0:
+        print(f"[Video Film Grain] Applying master film grain filter (intensity: {v4_film_grain}) to final clip...")
+        final_clip = add_film_grain_filter(final_clip, intensity=v4_film_grain)
     
     # 4. Cinematic BGM Ducking Mixer
     bgm_mood = script_data.get("overall_bgm_mood", "epic_orchestral")
@@ -1234,6 +1574,9 @@ def generate_full_video(topic, is_shorts=True, output_filename="final_output.mp4
             
             # Mix with narration and SFX
             mixed_audio = CompositeAudioClip([final_clip.audio, ducked_bgm])
+            if v4_compressor:
+                print("[Audio Compressor] Applying master compressor/limiter to mixed audio...")
+                mixed_audio = apply_compressor_filter(mixed_audio)
             final_clip = final_clip.set_audio(mixed_audio)
         except Exception as e:
             print(f"[BGM Warning] Failed to mix background music: {e}")
@@ -1271,6 +1614,14 @@ def generate_full_video(topic, is_shorts=True, output_filename="final_output.mp4
         shutil.rmtree(temp_dir)
     except Exception as e:
         print(f"[Cleanup Warning] Failed to delete temp directory {temp_dir}: {e}")
+            
+    # 7. Upload to Google Cloud Storage if bucket name is set
+    if v5_gcs_bucket and v5_gcs_bucket.strip() != "":
+        print(f"[GCS Integration] Attempting GCS upload to bucket '{v5_gcs_bucket}'...")
+        destination_blob = f"videos/{os.path.basename(output_filename)}"
+        gcs_url = upload_file_to_gcs(output_filename, v5_gcs_bucket, destination_blob)
+        if gcs_url:
+            script_data["gcs_url"] = gcs_url
             
     if progress_callback:
         progress_callback("DONE")

@@ -11,3 +11,5 @@ anthropic
 google-generativeai
 google-genai
 openai
+google-cloud-storage
+

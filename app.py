@@ -342,6 +342,348 @@ def get_progress_callback(placeholder):
     return progress_callback
 
 
+def render_production_flow(version):
+    """
+    Renders the Edit, Render, and Result steps for a unified production pipeline.
+    version is one of: "v4.0.0", "v5.0.0"
+    """
+    if st.session_state.step == "edit":
+        st.markdown(f"### 📝 2단계: 대본 및 연출 디테일 수정 ({version})")
+        
+        if st.session_state.script_data is None:
+            st.warning("생성된 대본이 없습니다. 처음 단계로 돌아갑니다.")
+            st.session_state.step = "input"
+            st.rerun()
+            
+        script_data = st.session_state.script_data
+        
+        st.markdown("#### ⚙️ 전체 설정")
+        col_t1, col_t2 = st.columns([2, 1])
+        with col_t1:
+            script_data["title"] = st.text_input("유튜브 동영상 제목", value=script_data.get("title", ""), key=f"v_title_{version}")
+            script_data["description"] = st.text_area("동영상 설명 (Description)", value=script_data.get("description", ""), key=f"v_desc_{version}")
+        with col_t2:
+            tags_str = st.text_input("태그 (쉼표로 구분)", value=", ".join(script_data.get("tags", [])), key=f"v_tags_{version}")
+            script_data["tags"] = [t.strip() for t in tags_str.split(",") if t.strip()]
+            
+            bgm_moods = ["epic_orchestral", "dark_mystery", "sad_piano", "intense_suspense"]
+            bgm_mood = script_data.get("overall_bgm_mood", "epic_orchestral")
+            if bgm_mood not in bgm_moods:
+                bgm_moods.append(bgm_mood)
+            script_data["overall_bgm_mood"] = st.selectbox("배경음악 무드", bgm_moods, index=bgm_moods.index(bgm_mood), key=f"v_bgm_{version}")
+
+        st.markdown("---")
+        st.markdown("#### 🎬 씬(Scene)별 상세 편집")
+        
+        scenes = script_data.get("scenes", [])
+        for i, scene in enumerate(scenes):
+            with st.container(border=True):
+                st.markdown(f"##### 🎥 Scene {i+1}")
+                col_ed1, col_ed2 = st.columns([2, 1.2])
+                
+                with col_ed1:
+                    scene["narration"] = st.text_area(f"씬 {i+1} 나레이션 대사 (한국어)", value=scene.get("narration", ""), key=f"scene_narr_{version}_{i}")
+                    scene["visual_prompt"] = st.text_area(f"씬 {i+1} 이미지 생성 프롬프트 (영어)", value=scene.get("visual_prompt", ""), key=f"scene_prompt_{version}_{i}")
+                    
+                with col_ed2:
+                    camera_info = scene.get("camera_movement", {})
+                    camera_types = ["zoom_in", "zoom_out", "pan_left", "pan_right", "pan_up", "pan_down"]
+                    cam_type = camera_info.get("type", "zoom_in")
+                    if cam_type not in camera_types:
+                        camera_types.append(cam_type)
+                    
+                    selected_cam_type = st.selectbox(f"카메라 연출", camera_types, index=camera_types.index(cam_type), key=f"scene_cam_type_{version}_{i}")
+                    
+                    camera_speeds = ["slow", "medium"]
+                    cam_speed = camera_info.get("speed", "slow")
+                    if cam_speed not in camera_speeds:
+                        camera_speeds.append(cam_speed)
+                    selected_cam_speed = st.selectbox(f"카메라 속도", camera_speeds, index=camera_speeds.index(cam_speed), key=f"scene_cam_speed_{version}_{i}")
+                    scene["camera_movement"] = {"type": selected_cam_type, "speed": selected_cam_speed}
+                    
+                    sfx_list = ["none", "sword_clash", "thunder", "wind_howl", "horse_gallop", "fire_crackle"]
+                    sfx_trigger = scene.get("sfx_trigger", "none")
+                    if sfx_trigger not in sfx_list:
+                        sfx_list.append(sfx_trigger)
+                        
+                    selected_sfx = st.selectbox(f"효과음(SFX)", sfx_list, index=sfx_list.index(sfx_trigger), key=f"scene_sfx_{version}_{i}")
+                    
+                    sfx_timings = ["start", "middle", "end"]
+                    sfx_timing = scene.get("sfx_timing", "start")
+                    if sfx_timing not in sfx_timings:
+                        sfx_timings.append(sfx_timing)
+                    selected_sfx_timing = st.selectbox(f"효과음 타이밍", sfx_timings, index=sfx_timings.index(sfx_timing), key=f"scene_sfx_timing_{version}_{i}")
+                    scene["sfx_trigger"] = selected_sfx
+                    scene["sfx_timing"] = selected_sfx_timing
+                    
+                    if st.button(f"🗑️ Scene {i+1} 삭제", key=f"del_scene_{version}_{i}"):
+                        scenes.pop(i)
+                        st.session_state.script_data["scenes"] = scenes
+                        st.rerun()
+                        
+        col_act1, col_act2, col_act3 = st.columns([1, 1, 2])
+        with col_act1:
+            if st.button("➕ 씬 추가", key=f"add_scene_btn_{version}"):
+                new_scene = {
+                    "narration": "새로운 장면 나레이션을 입력하세요.",
+                    "visual_prompt": "A cinematic shot of a scene, detailed, photorealistic",
+                    "camera_movement": {"type": "zoom_in", "speed": "slow"},
+                    "sfx_trigger": "none",
+                    "sfx_timing": "start"
+                }
+                scenes.append(new_scene)
+                st.session_state.script_data["scenes"] = scenes
+                st.rerun()
+        with col_act2:
+            if st.button("↩️ 대본 초기화 및 처음으로", key=f"reset_scene_btn_{version}"):
+                st.session_state.script_data = None
+                st.session_state.step = "input"
+                st.rerun()
+        with col_act3:
+            if st.button("🚀 3단계: 최종 비디오 렌더링 시작!", use_container_width=True, type="primary", key=f"start_render_btn_{version}"):
+                st.session_state.step = "render"
+                st.rerun()
+
+    elif st.session_state.step == "render":
+        st.markdown(f"### ⚙️ 3단계: 비디오 렌더링 및 파일 합성 ({version})")
+        if st.session_state.script_data is None:
+            st.warning("렌더링할 대본 데이터가 없습니다.")
+            st.session_state.step = "input"
+            st.rerun()
+            
+        progress_area = st.empty()
+        cb = get_progress_callback(progress_area)
+        
+        try:
+            import core_generator
+            
+            active_gemini_key = st.session_state.api_gemini if st.session_state.api_gemini else gemini_key
+            active_eleven_key = st.session_state.api_eleven if st.session_state.api_eleven else elevenlabs_key
+            active_fal_key = st.session_state.api_fal if st.session_state.api_fal else fal_key
+            active_openai_key = st.session_state.api_openai if st.session_state.api_openai else openai_key
+            active_pexels_key = st.session_state.api_pexels if st.session_state.api_pexels else pexels_key
+            
+            os.environ["GEMINI_API_KEY"] = active_gemini_key
+            if active_eleven_key:
+                os.environ["ELEVENLABS_API_KEY"] = active_eleven_key
+            if active_fal_key:
+                os.environ["FAL_API_KEY"] = active_fal_key
+                os.environ["FAL_KEY"] = active_fal_key
+            if active_openai_key:
+                os.environ["OPENAI_API_KEY"] = active_openai_key
+            if active_pexels_key:
+                os.environ["PEXELS_API_KEY"] = active_pexels_key
+
+            # Run background cleanup of old dynamic files (older than 10 mins)
+            cleanup_old_files()
+            
+            import uuid
+            timestamp = int(time.time())
+            unique_id = uuid.uuid4().hex[:8]
+            
+            # Make dynamic uniquely isolatable names for temp dir and outputs
+            temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"temp_assets_{timestamp}_{unique_id}")
+            output_filename = f"final_output_{timestamp}_{unique_id}.mp4"
+            
+            # version-specific parameters mapping
+            v4_easing = "Linear"
+            v4_film_grain = 0
+            v4_vignette = False
+            v4_3d_panning = False
+            v4_compressor = False
+            v4_stability = 0.75
+            v4_clarity = 0.75
+            v4_style = 0.0
+            
+            v5_gcs_bucket = ""
+            
+            # Set up parameters based on version selection
+            if version == "v4.0.0":
+                v4_easing = st.session_state.v4_easing
+                v4_film_grain = st.session_state.v4_film_grain
+                v4_vignette = st.session_state.v4_vignette
+                v4_3d_panning = st.session_state.v4_3d_panning
+                v4_compressor = st.session_state.v4_compressor
+                v4_stability = st.session_state.v4_voice_stability
+                v4_clarity = st.session_state.v4_voice_clarity
+                v4_style = st.session_state.v4_voice_style
+                
+                tts_provider = st.session_state.tts_provider
+                tts_voice_id = st.session_state.tts_voice_id
+                image_provider = st.session_state.image_provider
+            
+            elif version == "v5.0.0":
+                # Google Native
+                tts_provider = "google"
+                voice_raw = st.session_state.v5_gtts_voice
+                voice_parts = voice_raw.split(" ")
+                tts_voice_id = voice_parts[0] if len(voice_parts) > 0 else "ko-KR-Neural2-A"
+                image_provider = "google"
+                v5_gcs_bucket = st.session_state.v5_gcs_bucket
+
+            video_path, script_res_data = core_generator.generate_full_video(
+                st.session_state.topic, 
+                is_shorts=st.session_state.is_shorts, 
+                output_filename=output_filename,
+                tts_provider=tts_provider,
+                tts_voice_id=tts_voice_id,
+                tts_api_key=active_eleven_key if tts_provider == "elevenlabs" else active_gemini_key,
+                image_provider=image_provider,
+                fal_key=active_fal_key,
+                openai_key=active_openai_key,
+                pregenerated_script=st.session_state.script_data,
+                target_size=st.session_state.target_size,
+                content_skin=st.session_state.content_genre,
+                video_skin=st.session_state.video_skin,
+                pexels_key=active_pexels_key,
+                progress_callback=cb,
+                temp_dir=temp_dir,
+                v4_easing=v4_easing,
+                v4_film_grain=v4_film_grain,
+                v4_vignette=v4_vignette,
+                v4_3d_panning=v4_3d_panning,
+                v4_compressor=v4_compressor,
+                v4_voice_stability=v4_stability,
+                v4_voice_clarity=v4_clarity,
+                v4_voice_style=v4_style,
+                v5_gcs_bucket=v5_gcs_bucket
+            )
+            
+            st.session_state.script_data = script_res_data
+            
+            stable_video_path = f"output_render_{timestamp}_{unique_id}.mp4"
+            shutil.copy(video_path, stable_video_path)
+            st.session_state.final_video_path = stable_video_path
+            
+            # Clean up the initial raw render filename to keep directory clean
+            try:
+                os.remove(output_filename)
+            except Exception:
+                pass
+            
+            cb("RENDER")  # Update to final render (Thumbnails & Packaging)
+            thumbnail_path = f"thumbnail_output_{timestamp}_{unique_id}.png"
+            temp_thumb_bg_path = f"temp_thumb_bg_{timestamp}_{unique_id}.jpg"
+            
+            core_generator.generate_cinematic_image(
+                f"A dramatic and historical scene representing {st.session_state.topic}, digital art, masterpiece, realistic, cinematic lighting",
+                temp_thumb_bg_path,
+                is_shorts=False,
+                provider=image_provider,
+                fal_key=active_fal_key,
+                openai_key=active_openai_key,
+                gemini_key=active_gemini_key
+            )
+            
+            thumb_bg = Image.open(temp_thumb_bg_path)
+            thumb_bg = thumb_bg.resize((1280, 720))
+            draw = ImageDraw.Draw(thumb_bg)
+            font = core_generator.get_system_font(font_size=80)
+            
+            clean_title = st.session_state.script_data.get("title", st.session_state.topic)
+            lines = core_generator.wrap_text(clean_title, font, 1100, draw)
+            
+            current_y = 180
+            for line in lines:
+                bbox = draw.textbbox((0, 0), line, font=font) if hasattr(draw, "textbbox") else draw.textsize(line, font=font)
+                line_w = bbox[2] - bbox[0] if hasattr(draw, "textbbox") else bbox[0]
+                line_h = bbox[3] - bbox[1] if hasattr(draw, "textbbox") else bbox[1]
+                x = (1280 - line_w) // 2
+                
+                stroke_w = 6
+                for dx in range(-stroke_w, stroke_w+1):
+                    for dy in range(-stroke_w, stroke_w+1):
+                        draw.text((x+dx, current_y+dy), line, font=font, fill=(0, 0, 0, 255))
+                        
+                draw.text((x, current_y), line, font=font, fill=(255, 235, 59, 255))
+                current_y += line_h + 20
+                
+            thumb_bg.save(thumbnail_path)
+            st.session_state.thumbnail_path = thumbnail_path
+            
+            try:
+                os.remove(temp_thumb_bg_path)
+            except Exception:
+                pass
+                
+            cb("DONE")
+            time.sleep(1.5)
+            st.session_state.step = "result"
+            st.rerun()
+        except Exception as e:
+            st.error(f"❌ 영상 제작 중 오류 발생: {e}")
+            if st.button("↩️ 편집 단계로 돌아가기", key=f"err_back_btn_{version}"):
+                st.session_state.step = "edit"
+                st.rerun()
+
+    elif st.session_state.step == "result":
+        st.markdown(f"### 🎉 4단계: 비디오 제작 및 업로드 결과 ({version})")
+        col_res1, col_res2 = st.columns([2, 1.2])
+        
+        with col_res1:
+            if st.session_state.final_video_path:
+                st.markdown("### 🎬 완성된 영상 미리보기")
+                st.video(st.session_state.final_video_path)
+                
+                st.markdown("### 📝 최종 기획서 및 대본")
+                with st.expander("영상 메타데이터 및 대본 보기", expanded=True):
+                    st.write(f"**제목**: {st.session_state.script_data.get('title')}")
+                    st.write(f"**설명**: {st.session_state.script_data.get('description')}")
+                    st.write(f"**태그**: {', '.join(st.session_state.script_data.get('tags', []))}")
+                    st.write(f"**배경음악 분위기**: {st.session_state.script_data.get('overall_bgm_mood')}")
+                    
+                    if version == "v5.0.0" and "gcs_url" in st.session_state.script_data:
+                        st.write("---")
+                        st.markdown(f"🟢 **Google Cloud Storage 업로드 성공!**")
+                        st.markdown(f"🔗 [GCS 다운로드 파일 링크]({st.session_state.script_data['gcs_url']})")
+                        
+                    st.write("---")
+                    for i, scene in enumerate(st.session_state.script_data.get("scenes", [])):
+                        st.markdown(f"**씬 {i+1} 나레이션:**")
+                        st.info(scene.get("narration"))
+                        st.markdown(f"- **카메라 연출:** {scene.get('camera_movement', {}).get('type')} ({scene.get('camera_movement', {}).get('speed')})")
+                        st.markdown(f"- **효과음(SFX):** {scene.get('sfx_trigger')} ({scene.get('sfx_timing')})")
+                        
+        with col_res2:
+            if st.session_state.thumbnail_path:
+                st.markdown("### 🖼️ 패키징된 썸네일")
+                st.image(st.session_state.thumbnail_path, use_column_width=True)
+                
+            st.markdown("### 📢 YouTube 채널로 전송")
+            st.info("유튜브 자동 업로드를 위해서는 `client_secrets.json` 파일이 루트 폴더에 준비되어야 합니다.")
+            
+            secrets_exist = os.path.exists("client_secrets.json")
+            if not secrets_exist:
+                st.warning("⚠️ `client_secrets.json` 파일이 없습니다. OAuth 인증 설정을 확인하세요.")
+                
+            upload_btn = st.button("📢 유튜브에 비디오 즉시 업로드", disabled=not secrets_exist, use_container_width=True, key=f"yt_up_btn_{version}")
+            
+            if upload_btn:
+                with st.spinner("📡 유튜브 API 연동 및 업로드 처리 중..."):
+                    try:
+                        import youtube_uploader
+                        vid_id = youtube_uploader.upload_video(
+                            video_path=st.session_state.final_video_path,
+                            title=st.session_state.script_data.get("title", st.session_state.topic),
+                            description=st.session_state.script_data.get("description", ""),
+                            tags=st.session_state.script_data.get("tags", []),
+                            category_id="22",
+                            privacy_status=st.session_state.privacy_status
+                        )
+                        youtube_uploader.upload_thumbnail(vid_id, st.session_state.thumbnail_path)
+                        st.success(f"🎉 유튜브 업로드 성공! 비디오 ID: {vid_id}")
+                        st.markdown(f"🔗 [유튜브 영상 링크](https://youtu.be/{vid_id})")
+                    except Exception as e:
+                        st.error(f"유튜브 업로드 실패: {e}")
+                        
+            st.markdown("---")
+            if st.button("↩️ 처음으로 (새 비디오 만들기)", use_container_width=True, key=f"finish_btn_{version}"):
+                st.session_state.script_data = None
+                st.session_state.final_video_path = None
+                st.session_state.thumbnail_path = None
+                st.session_state.step = "input"
+                st.rerun()
+
 
 # --- 📂 VERSION SWITCHER AT THE VERY TOP ---
 st.markdown("""
@@ -446,53 +788,125 @@ if "v5.0.0" in selected_version:
 
     # Page 2: Studio
     elif st.session_state.active_menu == "Studio":
-        st.markdown("### 🎬 Vertex AI 비디오 팩토리 스튜디오")
-        
-        col1, col2 = st.columns([2, 1.2])
-        with col1:
-            st.session_state.v5_sheet_id = st.text_input(
-                "🟢 Google Sheets ID (대본 시트 연동)", 
-                value=st.session_state.v5_sheet_id,
-                placeholder="예: 1zH8m8Z5T1u...",
-                help="구글 스프레드시트 ID를 입력하면 시트 내의 대본 데이터를 가져와 일괄 자동 제작할 수 있습니다."
-            )
+        if st.session_state.step == "input":
+            st.markdown("### 🎬 Vertex AI 비디오 팩토리 스튜디오")
             
-            topic_input = st.text_input(
-                "직접 입력할 주제 (스프레드시트 미사용 시)", 
-                value=st.session_state.topic,
-                placeholder="예: 구글 크롬 브라우저의 역사와 탄생 비화"
-            )
-            
-            st.markdown("#### ☁️ Google Cloud TTS & Imagen 3 설정")
-            
-            st.session_state.v5_gtts_voice = st.selectbox(
-                "구글 프리미엄 한국어 성우 보이스",
-                ["ko-KR-Neural2-A (남성 - 표준)", "ko-KR-Neural2-B (여성 - 표준)", "ko-KR-Wavenet-A (남성 - 중후함)", "ko-KR-Journey-F (여성 - 친근함)", "ko-KR-Studio-O (남성 - 뉴스 성우)"],
-                index=0
-            )
-            
-            st.session_state.v5_imagen_aspect = st.selectbox(
-                "Google Imagen 3 이미지 비율 프리셋",
-                ["9:16 (쇼츠 세로형)", "16:9 (일반 가로형)", "1:1 (정사각형)"],
-                index=0
-            )
-            
-            g_render_btn = st.button("🚀 Google Native 파이프라인 가동!", use_container_width=True, type="primary")
-            if g_render_btn:
-                st.warning("⚠️ 구글 네이티브 5.0.0의 핵심 아키텍처 결합(GCS, Google TTS, Imagen 3, Sheets API 연동)이 백그라운드에 세팅되었으며, 다음 릴리즈에서 동영상 마스터 렌더링에 실시간 바인딩될 예정입니다.")
+            col1, col2 = st.columns([2, 1.2])
+            with col1:
+                st.session_state.v5_sheet_id = st.text_input(
+                    "🟢 Google Sheets ID (대본 시트 연동)", 
+                    value=st.session_state.v5_sheet_id,
+                    placeholder="예: 1zH8m8Z5T1u...",
+                    help="구글 스프레드시트 ID를 입력하면 시트 내의 대본 데이터를 가져와 일괄 자동 제작할 수 있습니다."
+                )
                 
-        with col2:
-            st.info("""
-            **📢 구글 에코시스템 핵심 팁**
-            - **Google Sheets 연동**: 시트에 `Topic`, `Visual Prompt`, `Narration` 컬럼을 생성해두면 여러 편의 쇼츠를 1클릭으로 제작 가능합니다.
-            - **Imagen 3**: 최고의 텍스트 렌더링 화질과 공간 원근감을 제공하는 구글의 플래그십 이미지 생성 모델입니다.
-            """)
+                topic_input = st.text_input(
+                    "직접 입력할 주제 (스프레드시트 미사용 시)", 
+                    value=st.session_state.topic,
+                    placeholder="예: 구글 크롬 브라우저의 역사와 탄생 비화"
+                )
+                
+                st.markdown("#### ☁️ Google Cloud TTS & Imagen 3 설정")
+                
+                st.session_state.v5_gtts_voice = st.selectbox(
+                    "구글 프리미엄 한국어 성우 보이스",
+                    ["ko-KR-Neural2-A (남성 - 표준)", "ko-KR-Neural2-B (여성 - 표준)", "ko-KR-Wavenet-A (남성 - 중후함)", "ko-KR-Journey-F (여성 - 친근함)", "ko-KR-Studio-O (남성 - 뉴스 성우)"],
+                    index=0
+                )
+                
+                st.session_state.v5_imagen_aspect = st.selectbox(
+                    "Google Imagen 3 이미지 비율 프리셋",
+                    ["9:16 (쇼츠 세로형)", "16:9 (일반 가로형)", "1:1 (정사각형)"],
+                    index=0
+                )
+                
+                g_render_btn = st.button("🚀 Google Native 파이프라인 가동!", use_container_width=True, type="primary")
+                if g_render_btn:
+                    if st.session_state.v5_sheet_id.strip():
+                        with st.spinner("📊 Google Sheets에서 대본 데이터를 불러오는 중..."):
+                            try:
+                                import core_generator
+                                script_data = core_generator.fetch_script_from_google_sheets(st.session_state.v5_sheet_id.strip())
+                                st.session_state.script_data = script_data
+                                st.session_state.topic = script_data.get("title", "Google Sheets AI Video")
+                                st.session_state.step = "edit"
+                                st.success("📊 Google Sheets 대본 로드 완료!")
+                                time.sleep(1)
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"❌ Google Sheets 로드 실패: {e}")
+                    else:
+                        if not topic_input.strip():
+                            st.error("주제를 입력하거나 Google Sheets ID를 입력해 주세요.")
+                        else:
+                            st.session_state.topic = topic_input
+                            with st.spinner("🧠 Gemini 2.5 Pro가 구글 네이티브 비디오 제작용 대본을 빌드하는 중..."):
+                                try:
+                                    import core_generator
+                                    active_gemini_key = st.session_state.api_gemini if st.session_state.api_gemini else gemini_key
+                                    os.environ["GEMINI_API_KEY"] = active_gemini_key
+                                    
+                                    script_data = core_generator.generate_script_from_gemini(
+                                        st.session_state.topic, 
+                                        is_shorts=st.session_state.is_shorts, 
+                                        character_desc=st.session_state.character_desc, 
+                                        visual_style=st.session_state.visual_style,
+                                        content_skin=st.session_state.content_genre
+                                    )
+                                    st.session_state.script_data = script_data
+                                    st.session_state.step = "edit"
+                                    st.success("🎉 시네마틱 다큐멘터리 대본이 성공적으로 작성되었습니다!")
+                                    time.sleep(1)
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"대본 생성 실패: {e}")
+                                    
+            with col2:
+                st.info("""
+                **📢 구글 에코시스템 핵심 팁**
+                - **Google Sheets 연동**: 시트에 `Topic`, `Visual Prompt`, `Narration` 컬럼을 생성해두면 여러 편의 쇼츠를 1클릭으로 제작 가능합니다.
+                - **Imagen 3**: 최고의 텍스트 렌더링 화질과 공간 원근감을 제공하는 구글의 플래그십 이미지 생성 모델입니다.
+                """)
+        else:
+            render_production_flow("v5.0.0")
 
     # Page 3: Library
     elif st.session_state.active_menu == "Library":
         st.markdown("### 📁 Google Cloud Storage (GCS) 자산보관함")
-        st.markdown("GCS 버킷 `my-video-factory-bucket`에 안전하게 업로드되어 아카이빙된 프로젝트 목록입니다.")
-        st.info("현재 버킷이 비어 있습니다. 스튜디오에서 첫 구글 네이티브 비디오를 렌더링하여 버킷에 동기화해보세요!")
+        st.markdown(f"GCS 버킷 `{st.session_state.v5_gcs_bucket}`에 업로드되어 아카이빙된 프로젝트 목록입니다.")
+        
+        try:
+            from google.cloud import storage
+            storage_client = storage.Client()
+            bucket = storage_client.bucket(st.session_state.v5_gcs_bucket)
+            blobs = list(bucket.list_blobs(max_results=10))
+            mp4_blobs = [b for b in blobs if b.name.endswith(".mp4")]
+            if mp4_blobs:
+                for idx, blob in enumerate(mp4_blobs):
+                    with st.container(border=True):
+                        col_g1, col_g2 = st.columns([2, 1.2])
+                        with col_g1:
+                            st.write(f"🎥 **블롭명**: `{blob.name}`")
+                            st.video(blob.public_url)
+                        with col_g2:
+                            st.write(f"📦 **크기**: {blob.size / (1024 * 1024):.2f} MB")
+                            st.write(f"📅 **업데이트**: {blob.updated}")
+                            st.markdown(f"🔗 [GCS 퍼블릭 링크]({blob.public_url})")
+            else:
+                st.info("☁️ GCS 버킷 내에 업로드된 mp4 동영상이 없습니다. 스튜디오에서 첫 구글 네이티브 비디오를 렌더링해보세요!")
+        except Exception as e:
+            st.warning(f"⚠️ GCS 버킷 파일 목록 조회 실패 (인증 또는 버킷 설정을 확인하세요): {e}")
+            st.markdown("---")
+            st.markdown("##### 📁 로컬에 저장된 동영상 목록 (오프라인 폴백):")
+            video_files = [f for f in os.listdir(".") if f.endswith(".mp4") and os.path.isfile(f) and f != "test_shorts.mp4"]
+            if not video_files:
+                st.info("아직 생성된 비디오가 없습니다.")
+            else:
+                video_files.sort(key=os.path.getmtime, reverse=True)
+                for idx, video_file in enumerate(video_files):
+                    with st.container(border=True):
+                        st.markdown(f"##### 🎥 파일명: `{video_file}`")
+                        st.video(video_file)
 
     # Page 4: Profile
     elif st.session_state.active_menu == "Profile":
@@ -503,10 +917,17 @@ if "v5.0.0" in selected_version:
     elif st.session_state.active_menu == "Settings":
         st.markdown("### ⚙️ GCP API Credentials & OAuth 설정")
         with st.form("google_api_config"):
-            st.text_input("Google Cloud Service Account JSON Key Path", placeholder="/path/to/service_account.json", type="password")
-            st.text_input("Google Cloud Project ID", placeholder="my-gcp-project-1234")
-            st.session_state.v5_gcs_bucket = st.text_input("GCS Bucket Name", value=st.session_state.v5_gcs_bucket)
-            st.form_submit_button("💾 구글 설정 저장")
+            sa_path = st.text_input("Google Cloud Service Account JSON Key Path", value=os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", ""), placeholder="/path/to/service_account.json", type="password")
+            project_id = st.text_input("Google Cloud Project ID", value=os.environ.get("GOOGLE_CLOUD_PROJECT", ""), placeholder="my-gcp-project-1234")
+            bucket_name = st.text_input("GCS Bucket Name", value=st.session_state.v5_gcs_bucket)
+            submitted = st.form_submit_button("💾 구글 설정 저장")
+            if submitted:
+                if sa_path:
+                    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = sa_path
+                if project_id:
+                    os.environ["GOOGLE_CLOUD_PROJECT"] = project_id
+                st.session_state.v5_gcs_bucket = bucket_name
+                st.success("💾 Google Cloud 설정이 저장되었습니다!")
 
 # =========================================================================
 # ==================== v4.0.0: 시네마틱 스튜디오 프로페셔널 ====================
@@ -568,49 +989,75 @@ elif "v4.0.0" in selected_version:
 
     # Page 2: Studio
     elif st.session_state.active_menu == "Studio":
-        st.markdown("### 🎬 하이엔드 비디오 프로 스튜디오")
-        
-        col1, col2 = st.columns([2, 1.2])
-        with col1:
-            topic_input = st.text_input(
-                "제작할 고격조 다큐멘터리 주제를 입력하세요:",
-                value=st.session_state.topic,
-                placeholder="예: 링컨과 대통령 헌법 선언문의 비화"
-            )
+        if st.session_state.step == "input":
+            st.markdown("### 🎬 하이엔드 비디오 프로 스튜디오")
             
-            st.markdown("#### 🎥 1. 비주얼 포스트 프로세싱 (Visual Effects)")
-            st.session_state.v4_easing = st.selectbox(
-                "카메라 줌/팬 Easing 곡선 (비선형 가속)",
-                ["Cubic Ease-in-out (할리우드 시네마틱)", "Linear (선형 직선 속도)", "Quadratic Ease-out (부드러운 감속)"]
-            )
-            
-            st.session_state.v4_film_grain = st.slider(
-                "필름 그레인 노이즈 강도 (Film Grain Noise)", 
-                min_value=0, max_value=100, value=st.session_state.v4_film_grain,
-                help="값이 높아질수록 아날로그 영화 필름 느낌의 미세 노이즈가 강해집니다."
-            )
-            
-            st.session_state.v4_vignette = st.checkbox("비네팅 감쇠 효과 활성화 (Vignette Effect)", value=st.session_state.v4_vignette)
-            
-            st.markdown("#### 🎙️ 2. 오디오 마스터링 (Audio Mastering)")
-            st.session_state.v4_3d_panning = st.checkbox("3D 입체 효과음 패닝 활성화 (Spatial Sound SFX)", value=st.session_state.v4_3d_panning)
-            st.session_state.v4_compressor = st.checkbox("나레이션 컴프레서/리미터 결합 (Voice Radio Tone)", value=st.session_state.v4_compressor)
-            
-            st.markdown("#### 🗣️ 3. ElevenLabs TTS 디테일 튜닝")
-            st.session_state.v4_voice_stability = st.slider("Stability (목소리 일관성 및 정돈)", 0.0, 1.0, st.session_state.v4_voice_stability)
-            st.session_state.v4_voice_clarity = st.slider("Clarity + Similarity Boost (선명도 및 모사력)", 0.0, 1.0, st.session_state.v4_voice_clarity)
-            st.session_state.v4_voice_style = st.slider("Style Exaggeration (감정 표현 강도)", 0.0, 1.0, st.session_state.v4_voice_style)
-            
-            pro_render_btn = st.button("🚀 최고화질 프로 시네마틱 렌더링 기동!", use_container_width=True, type="primary")
-            if pro_render_btn:
-                st.info("🎬 시네마틱 스튜디오 프로페셔널 4.0.0의 고화질 합성 파라미터가 백그라운드 렌더러에 설정되었습니다. 다음 단계에서 오디오 주파수 필터 및 Easing 보간 연산이 실시간 프레임 인코더에 연결될 예정입니다.")
+            col1, col2 = st.columns([2, 1.2])
+            with col1:
+                topic_input = st.text_input(
+                    "제작할 고격조 다큐멘터리 주제를 입력하세요:",
+                    value=st.session_state.topic,
+                    placeholder="예: 링컨과 대통령 헌법 선언문의 비화"
+                )
                 
-        with col2:
-            st.markdown("#### 🎛️ 하이엔드 연출 가이드")
-            st.info("""
-            - **Cubic Easing**: 모션 그래픽이 출발할 때는 천천히, 중간에는 빠르게, 멈출 때는 서서히 감속하여 전문 영화 카메라 줌 느낌을 자아냅니다.
-            - **Film Grain**: 디지털 영상 특유의 딱딱함을 모래 질감 노이즈로 덮어 고풍스러운 질감을 표현합니다.
-            """)
+                st.markdown("#### 🎥 1. 비주얼 포스트 프로세싱 (Visual Effects)")
+                st.session_state.v4_easing = st.selectbox(
+                    "카메라 줌/팬 Easing 곡선 (비선형 가속)",
+                    ["Cubic Ease-in-out (할리우드 시네마틱)", "Linear (선형 직선 속도)", "Quadratic Ease-out (부드러운 감속)"]
+                )
+                
+                st.session_state.v4_film_grain = st.slider(
+                    "필름 그레인 노이즈 강도 (Film Grain Noise)", 
+                    min_value=0, max_value=100, value=st.session_state.v4_film_grain,
+                    help="값이 높아질수록 아날로그 영화 필름 느낌의 미세 노이즈가 강해집니다."
+                )
+                
+                st.session_state.v4_vignette = st.checkbox("비네팅 감쇠 효과 활성화 (Vignette Effect)", value=st.session_state.v4_vignette)
+                
+                st.markdown("#### 🎙️ 2. 오디오 마스터링 (Audio Mastering)")
+                st.session_state.v4_3d_panning = st.checkbox("3D 입체 효과음 패닝 활성화 (Spatial Sound SFX)", value=st.session_state.v4_3d_panning)
+                st.session_state.v4_compressor = st.checkbox("나레이션 컴프레서/리미터 결합 (Voice Radio Tone)", value=st.session_state.v4_compressor)
+                
+                st.markdown("#### 🗣️ 3. ElevenLabs TTS 디테일 튜닝")
+                st.session_state.v4_voice_stability = st.slider("Stability (목소리 일관성 및 정돈)", 0.0, 1.0, st.session_state.v4_voice_stability)
+                st.session_state.v4_voice_clarity = st.slider("Clarity + Similarity Boost (선명도 및 모사력)", 0.0, 1.0, st.session_state.v4_voice_clarity)
+                st.session_state.v4_voice_style = st.slider("Style Exaggeration (감정 표현 강도)", 0.0, 1.0, st.session_state.v4_voice_style)
+                
+                pro_render_btn = st.button("🚀 최고화질 프로 시네마틱 렌더링 기동!", use_container_width=True, type="primary")
+                if pro_render_btn:
+                    if not topic_input.strip():
+                        st.error("다큐멘터리 주제를 입력해 주세요.")
+                    else:
+                        st.session_state.topic = topic_input
+                        with st.spinner("🧠 Gemini 2.5 Pro가 고격조 역사 다큐멘터리 대본을 작성하고 있습니다..."):
+                            try:
+                                import core_generator
+                                active_gemini_key = st.session_state.api_gemini if st.session_state.api_gemini else gemini_key
+                                os.environ["GEMINI_API_KEY"] = active_gemini_key
+                                
+                                script_data = core_generator.generate_script_from_gemini(
+                                    st.session_state.topic, 
+                                    is_shorts=st.session_state.is_shorts, 
+                                    character_desc=st.session_state.character_desc, 
+                                    visual_style=st.session_state.visual_style,
+                                    content_skin=st.session_state.content_genre
+                                )
+                                st.session_state.script_data = script_data
+                                st.session_state.step = "edit"
+                                st.success("🎉 시네마틱 다큐멘터리 대본이 성공적으로 작성되었습니다!")
+                                time.sleep(1)
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"대본 생성 실패: {e}")
+                                
+            with col2:
+                st.markdown("#### 🎛️ 하이엔드 연출 가이드")
+                st.info("""
+                - **Cubic Easing**: 모션 그래픽이 출발할 때는 천천히, 중간에는 빠르게, 멈출 때는 서서히 감속하여 전문 영화 카메라 줌 느낌을 자아냅니다.
+                - **Film Grain**: 디지털 영상 특유의 딱딱함을 모래 질감 노이즈로 덮어 고풍스러운 질감을 표현합니다.
+                """)
+        else:
+            render_production_flow("v4.0.0")
 
     # Page 3: Library
     elif st.session_state.active_menu == "Library":
