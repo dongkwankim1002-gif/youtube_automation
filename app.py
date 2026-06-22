@@ -199,6 +199,8 @@ if "v5_gcs_bucket" not in st.session_state:
     st.session_state.v5_gcs_bucket = "my-video-factory-bucket"
 if "v5_visual_model" not in st.session_state:
     st.session_state.v5_visual_model = "Google Imagen 3 (고품질 이미지 + 모션 연출)"
+if "gemini_exhausted" not in st.session_state:
+    st.session_state.gemini_exhausted = False
 if "v5_active_styles" not in st.session_state:
     st.session_state.v5_active_styles = ["시네마틱 실사 (Cinematic Realism)"]
 if "v5_style_strengths" not in st.session_state:
@@ -678,6 +680,20 @@ def render_production_flow(version):
             st.rerun()
         except Exception as e:
             st.error(f"❌ 영상 제작 중 오류 발생: {e}")
+            err_msg = str(e)
+            if version == "v5.0.0" and ("429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg or "credits are depleted" in err_msg):
+                st.warning("⚠️ **Gemini API 키 오류 감지**: 구글 AI 스튜디오 선불 크레딧이 부족합니다. 결제 상태를 확인하거나 새 API 키를 등록하세요.")
+                new_key = st.text_input("🔑 새로운 Gemini API Key 입력:", type="password", key=f"new_gemini_key_render_{version}")
+                if st.button("💾 API Key 업데이트 및 저장", key=f"save_key_render_{version}", use_container_width=True, type="primary"):
+                    if new_key.strip():
+                        st.session_state.api_gemini = new_key.strip()
+                        st.session_state.gemini_exhausted = False
+                        st.success("API Key가 업데이트되었습니다! 편집 단계로 돌아가 다시 렌더링해 주세요.")
+                        time.sleep(1.2)
+                        st.session_state.step = "edit"
+                        st.rerun()
+                    else:
+                        st.warning("유효한 API Key를 입력해 주세요.")
             if st.button("↩️ 편집 단계로 돌아가기", key=f"err_back_btn_{version}"):
                 st.session_state.step = "edit"
                 st.rerun()
@@ -859,6 +875,19 @@ if "v5.0.0" in selected_version:
             
             col1, col2 = st.columns([2, 1.2])
             with col1:
+                if st.session_state.gemini_exhausted:
+                    st.error("🚨 **Gemini API 키 크레딧 소진**: 구글 AI 스튜디오 선불 크레딧이 소진되었거나 호출 한도가 초과되었습니다.")
+                    new_key = st.text_input("🔑 새로운 Gemini API Key 입력:", type="password", key="new_gemini_key_input_v5")
+                    if st.button("💾 API Key 업데이트 및 저장", use_container_width=True, type="primary"):
+                        if new_key.strip():
+                            st.session_state.api_gemini = new_key.strip()
+                            st.session_state.gemini_exhausted = False
+                            st.success("API Key가 업데이트되었습니다! 다시 생성을 시도해 주세요.")
+                            time.sleep(1.2)
+                            st.rerun()
+                        else:
+                            st.warning("유효한 API Key를 입력해 주세요.")
+                            
                 st.session_state.v5_sheet_id = st.text_input(
                     "🟢 Google Sheets ID (대본 시트 연동)", 
                     value=st.session_state.v5_sheet_id,
@@ -974,6 +1003,9 @@ if "v5.0.0" in selected_version:
                                     time.sleep(1)
                                     st.rerun()
                                 except Exception as e:
+                                    err_msg = str(e)
+                                    if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg or "credits are depleted" in err_msg:
+                                        st.session_state.gemini_exhausted = True
                                     st.error(f"대본 생성 실패: {e}")
                                     
                 st.markdown("---")
@@ -1071,6 +1103,7 @@ if "v5.0.0" in selected_version:
             sa_path = st.text_input("Google Cloud Service Account JSON Key Path", value=os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", ""), placeholder="/path/to/service_account.json", type="password")
             project_id = st.text_input("Google Cloud Project ID", value=os.environ.get("GOOGLE_CLOUD_PROJECT", ""), placeholder="my-gcp-project-1234")
             bucket_name = st.text_input("GCS Bucket Name", value=st.session_state.v5_gcs_bucket)
+            gemini_key_input = st.text_input("Gemini API Key (Google AI Studio)", value=st.session_state.api_gemini, type="password", placeholder="AIzaSy...")
             submitted = st.form_submit_button("💾 구글 설정 저장")
             if submitted:
                 if sa_path:
@@ -1078,7 +1111,9 @@ if "v5.0.0" in selected_version:
                 if project_id:
                     os.environ["GOOGLE_CLOUD_PROJECT"] = project_id
                 st.session_state.v5_gcs_bucket = bucket_name
-                st.success("💾 Google Cloud 설정이 저장되었습니다!")
+                st.session_state.api_gemini = gemini_key_input.strip()
+                st.session_state.gemini_exhausted = False
+                st.success("💾 Google Cloud 및 Gemini API 설정이 저장되었습니다!")
 
 # =========================================================================
 # ==================== v4.0.0: 시네마틱 스튜디오 프로페셔널 ====================
