@@ -574,19 +574,31 @@ def render_production_flow(version):
                 image_provider = "google"
                 v5_gcs_bucket = st.session_state.v5_gcs_bucket
                 
-                # Dynamically set is_shorts and target_size based on selected aspect ratio
+                # Dynamically set is_shorts and target_size based on selected aspect ratio (optimized for Streamlit Cloud 1GB RAM)
                 if "9:16" in st.session_state.v5_imagen_aspect:
                     st.session_state.is_shorts = True
-                    st.session_state.target_size = (1080, 1920)
-                else:
+                    st.session_state.target_size = (540, 960)
+                elif "16:9" in st.session_state.v5_imagen_aspect:
                     st.session_state.is_shorts = False
-                    st.session_state.target_size = (1920, 1080)
+                    st.session_state.target_size = (960, 540)
+                else: # 1:1
+                    st.session_state.is_shorts = False
+                    st.session_state.target_size = (640, 640)
                     
                 # Dynamically map video_skin based on visual model
                 if "Veo" in st.session_state.v5_visual_model:
                     v5_video_skin = "Option 2: AI 비디오 직접 생성 (Google Veo)"
                 else:
                     v5_video_skin = "Option 1: 스틸컷 & Ken Burns 연출 (AI Image + Ken Burns)"
+
+            # Prevent Out-Of-Memory (OOM) crashes on Streamlit Cloud 1GB RAM limit by capping resolution
+            width, height = st.session_state.target_size
+            if width * height > 1280 * 720:
+                print(f"[OOM Protection] Capping resolution from {width}x{height} to 720p equivalent to prevent crash.")
+                if width > height:
+                    st.session_state.target_size = (1280, 720)
+                else:
+                    st.session_state.target_size = (720, 1280)
 
             video_path, script_res_data = core_generator.generate_full_video(
                 st.session_state.topic, 
