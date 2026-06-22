@@ -255,8 +255,12 @@ def wrap_text(text, font, max_width, draw):
     return lines
 
 
-def create_subtitle_image(text, width=1080, height=1920, font_size=48, output_path="subtitle.png", position="bottom", font_style="gothic"):
-    """Create a transparent PNG containing styled Korean subtitle text with word-level gold highlighting."""
+def create_subtitle_image(text, width=1080, height=1920, font_size=48, output_path="subtitle.png", position="bottom", font_style="gothic", version="v3.0.0"):
+    """Create a transparent PNG containing styled Korean subtitle text with version-specific premium styling."""
+    if version in ["v4.0.0", "v5.0.0"]:
+        # Modern documentary subtitles are smaller, cleaner, and less intrusive
+        font_size = int(font_size * 0.72)
+        
     # Create transparent image
     image = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
@@ -297,22 +301,40 @@ def create_subtitle_image(text, width=1080, height=1920, font_size=48, output_pa
             
         x = (width - line_w) // 2
         
-        # Draw background shadow rectangle
-        padding = 15
+        # Draw background shadow rectangle or modern glowing pill badge
+        padding = 12 if version in ["v4.0.0", "v5.0.0"] else 15
         rect_x0 = x - padding
         rect_y0 = current_y - padding
         rect_x1 = x + line_w + padding
         rect_y1 = current_y + line_h + padding
-        draw.rounded_rectangle([rect_x0, rect_y0, rect_x1, rect_y1], radius=10, fill=(0, 0, 0, 150))
+        
+        if version in ["v4.0.0", "v5.0.0"]:
+            bg_color = (15, 12, 12, 110) if version == "v4.0.0" else (10, 15, 20, 115)
+            border_color = (255, 215, 0, 160) if version == "v4.0.0" else (0, 229, 255, 160)
+            # Rounded pill with elegant accent outline
+            draw.rounded_rectangle([rect_x0, rect_y0, rect_x1, rect_y1], radius=12, fill=bg_color, outline=border_color, width=1)
+        else:
+            draw.rounded_rectangle([rect_x0, rect_y0, rect_x1, rect_y1], radius=10, fill=(0, 0, 0, 150))
         
         # Draw actual text with word-level highlight
         words_in_line = line.split(" ")
         curr_x = x
         for word in words_in_line:
             highlight = is_keyword_word(word)
-            # Gold color for keywords, White for standard text
-            color = (255, 215, 0, 255) if highlight else (255, 255, 255, 255)
             
+            # Determine color scheme based on version
+            if version == "v4.0.0":
+                color = (255, 215, 0, 255) if highlight else (255, 255, 255, 255)
+            elif version == "v5.0.0":
+                # Electric Cyan for Google Native look
+                color = (0, 229, 255, 255) if highlight else (255, 255, 255, 255)
+            else:
+                color = (255, 215, 0, 255) if highlight else (255, 255, 255, 255)
+            
+            # Draw premium drop shadow for high readability on low-opacity backgrounds
+            if version in ["v4.0.0", "v5.0.0"]:
+                draw.text((curr_x + 1, current_y + 1), word, font=font, fill=(0, 0, 0, 200))
+                
             draw.text((curr_x, current_y), word, font=font, fill=color)
             
             # Measure word and trailing space to update horizontal offset
@@ -1192,7 +1214,8 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
                       temp_dir="temp_assets",
                       v4_easing="Linear", v4_3d_panning=False,
                       v4_voice_stability=0.75, v4_voice_clarity=0.75, v4_voice_style=0.0,
-                      gemini_key=None):
+                      gemini_key=None,
+                      version="v3.0.0"):
     """Render a single scene: merges narration audio, visuals based on selected technical skin, subtitles, and SFX."""
     print(f"[Scene {scene_idx}] Rendering scene with skin: {video_skin} (Easing: {v4_easing}, Panning: {v4_3d_panning})...")
     
@@ -1300,7 +1323,7 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
     sub_position = "center" if "Option 5" in video_skin else "bottom"
     is_serif = "역사" in content_skin or "소설" in content_skin or "공포" in content_skin
     f_style = "serif" if is_serif else "gothic"
-    create_subtitle_image(scene_data["narration"], width, height, font_size=56 if sub_position == "center" else 42, output_path=subtitle_path, position=sub_position, font_style=f_style)
+    create_subtitle_image(scene_data["narration"], width, height, font_size=56 if sub_position == "center" else 42, output_path=subtitle_path, position=sub_position, font_style=f_style, version=version)
     sub_clip = ImageClip(subtitle_path).set_duration(narr_duration)
     
     # 4. Talking Avatar overlay (Option 4)
@@ -1430,7 +1453,8 @@ def generate_full_video(topic, is_shorts=True, output_filename="final_output.mp4
                         v4_easing="Linear", v4_film_grain=0, v4_vignette=False,
                         v4_3d_panning=False, v4_compressor=False,
                         v4_voice_stability=0.75, v4_voice_clarity=0.75, v4_voice_style=0.0,
-                        v5_gcs_bucket=""):
+                        v5_gcs_bucket="",
+                        version="v3.0.0"):
     """Entire video pipeline from scripting to final video composition with chosen technical skin."""
     print(f"[Start] Starting Cinematic AI Video Factory Pipeline with technical skin: {video_skin}...")
     
@@ -1470,7 +1494,8 @@ def generate_full_video(topic, is_shorts=True, output_filename="final_output.mp4
             topic=topic, content_skin=content_skin, temp_dir=temp_dir,
             v4_easing=v4_easing, v4_3d_panning=v4_3d_panning,
             v4_voice_stability=v4_voice_stability, v4_voice_clarity=v4_voice_clarity, v4_voice_style=v4_voice_style,
-            gemini_key=os.getenv("GEMINI_API_KEY")
+            gemini_key=os.getenv("GEMINI_API_KEY"),
+            version=version
         )
         scene_clips.append(clip)
         

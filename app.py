@@ -546,7 +546,8 @@ def render_production_flow(version):
                 v4_voice_stability=v4_stability,
                 v4_voice_clarity=v4_clarity,
                 v4_voice_style=v4_style,
-                v5_gcs_bucket=v5_gcs_bucket
+                v5_gcs_bucket=v5_gcs_bucket,
+                version=version
             )
             
             st.session_state.script_data = script_res_data
