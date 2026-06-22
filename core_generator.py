@@ -1500,7 +1500,7 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
             avatar_clip.close()
         except Exception:
             pass
-    if 'sfx_clip' in locals() and 'sfx_clip' in globals() and sfx_clip is not None:
+    if 'sfx_clip' in locals() and sfx_clip is not None:
         try:
             sfx_clip.close()
         except Exception:
