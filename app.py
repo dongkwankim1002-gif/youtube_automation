@@ -862,6 +862,41 @@ if "v5.0.0" in selected_version:
                                 except Exception as e:
                                     st.error(f"대본 생성 실패: {e}")
                                     
+                st.markdown("---")
+                st.markdown("### 🧪 10초 쾌속 테스트 코너 (Test Corner)")
+                st.caption("대본 생성 및 편집 단계를 건너뛰고, 미리 준비된 10초 분량(2개 씬)의 다큐멘터리 대본으로 즉시 영상 제작 파이프라인을 가동하여 자막 레이아웃, 목소리, 비주얼 화풍을 테스트합니다.")
+                
+                test_render_btn_v5 = st.button("🎬 10초 테스트 영상 즉시 제작", key="test_v5", use_container_width=True)
+                if test_render_btn_v5:
+                    test_script = {
+                        "title": "10초 시네마틱 테스트 비디오",
+                        "description": "버전별 연출 및 자막 렌더링 검증용 10초 테스트 비디오 #테스트 #다큐멘터리",
+                        "tags": ["테스트", "다큐멘터리", "시네마틱"],
+                        "overall_bgm_mood": "dark_mystery",
+                        "scenes": [
+                            {
+                                "narration": "역사의 위대한 전설은 아주 작은 시작에서 탄생합니다.",
+                                "visual_prompt": "A majestic cinematic sunrise over ancient mountains, detailed oil painting style, 8k",
+                                "camera_movement": {"type": "zoom_in", "speed": "slow"},
+                                "sfx_trigger": "none",
+                                "sfx_timing": "start"
+                            },
+                            {
+                                "narration": "시간의 흐름 속에서, 그 가치는 영원히 기억될 것입니다.",
+                                "visual_prompt": "An hourglass on a researcher's wooden table, warm study room, dramatic chiaroscuro, 8k",
+                                "camera_movement": {"type": "zoom_out", "speed": "slow"},
+                                "sfx_trigger": "none",
+                                "sfx_timing": "start"
+                            }
+                        ]
+                    }
+                    st.session_state.script_data = test_script
+                    st.session_state.topic = "10초 시네마틱 테스트 비디오"
+                    st.session_state.step = "render"
+                    st.success("⚡ 테스트용 대본 로드 완료! 렌더링 파이프라인으로 이동합니다.")
+                    time.sleep(1)
+                    st.rerun()
+                                    
             with col2:
                 st.info("""
                 **📢 구글 에코시스템 핵심 팁**
@@ -1050,6 +1085,41 @@ elif "v4.0.0" in selected_version:
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"대본 생성 실패: {e}")
+                                
+                st.markdown("---")
+                st.markdown("### 🧪 10초 쾌속 테스트 코너 (Test Corner)")
+                st.caption("대본 생성 및 편집 단계를 건너뛰고, 미리 준비된 10초 분량(2개 씬)의 다큐멘터리 대본으로 즉시 영상 제작 파이프라인을 가동하여 자막 레이아웃, 목소리, 비주얼 화풍을 테스트합니다.")
+                
+                test_render_btn_v4 = st.button("🎬 10초 테스트 영상 즉시 제작", key="test_v4", use_container_width=True)
+                if test_render_btn_v4:
+                    test_script = {
+                        "title": "10초 시네마틱 테스트 비디오",
+                        "description": "버전별 연출 및 자막 렌더링 검증용 10초 테스트 비디오 #테스트 #다큐멘터리",
+                        "tags": ["테스트", "다큐멘터리", "시네마틱"],
+                        "overall_bgm_mood": "dark_mystery",
+                        "scenes": [
+                            {
+                                "narration": "역사의 위대한 전설은 아주 작은 시작에서 탄생합니다.",
+                                "visual_prompt": "A majestic cinematic sunrise over ancient mountains, detailed oil painting style, 8k",
+                                "camera_movement": {"type": "zoom_in", "speed": "slow"},
+                                "sfx_trigger": "none",
+                                "sfx_timing": "start"
+                            },
+                            {
+                                "narration": "시간의 흐름 속에서, 그 가치는 영원히 기억될 것입니다.",
+                                "visual_prompt": "An hourglass on a researcher's wooden table, warm study room, dramatic chiaroscuro, 8k",
+                                "camera_movement": {"type": "zoom_out", "speed": "slow"},
+                                "sfx_trigger": "none",
+                                "sfx_timing": "start"
+                            }
+                        ]
+                    }
+                    st.session_state.script_data = test_script
+                    st.session_state.topic = "10초 시네마틱 테스트 비디오"
+                    st.session_state.step = "render"
+                    st.success("⚡ 테스트용 대본 로드 완료! 렌더링 파이프라인으로 이동합니다.")
+                    time.sleep(1)
+                    st.rerun()
                                 
             with col2:
                 st.markdown("#### 🎛️ 하이엔드 연출 가이드")
