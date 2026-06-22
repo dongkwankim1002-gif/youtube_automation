@@ -197,6 +197,8 @@ if "v5_imagen_aspect" not in st.session_state:
     st.session_state.v5_imagen_aspect = "9:16"
 if "v5_gcs_bucket" not in st.session_state:
     st.session_state.v5_gcs_bucket = "my-video-factory-bucket"
+if "v5_visual_model" not in st.session_state:
+    st.session_state.v5_visual_model = "Google Imagen 3 (고품질 이미지 + 모션 연출)"
 
 
 
@@ -496,6 +498,7 @@ def render_production_flow(version):
             v4_style = 0.0
             
             v5_gcs_bucket = ""
+            v5_video_skin = st.session_state.video_skin
             
             # Set up parameters based on version selection
             if version == "v4.0.0":
@@ -520,6 +523,20 @@ def render_production_flow(version):
                 tts_voice_id = voice_parts[0] if len(voice_parts) > 0 else "ko-KR-Neural2-A"
                 image_provider = "google"
                 v5_gcs_bucket = st.session_state.v5_gcs_bucket
+                
+                # Dynamically set is_shorts and target_size based on selected aspect ratio
+                if "9:16" in st.session_state.v5_imagen_aspect:
+                    st.session_state.is_shorts = True
+                    st.session_state.target_size = (1080, 1920)
+                else:
+                    st.session_state.is_shorts = False
+                    st.session_state.target_size = (1920, 1080)
+                    
+                # Dynamically map video_skin based on visual model
+                if "Veo" in st.session_state.v5_visual_model:
+                    v5_video_skin = "Option 2: AI 비디오 직접 생성 (Google Veo)"
+                else:
+                    v5_video_skin = "Option 1: 스틸컷 & Ken Burns 연출 (AI Image + Ken Burns)"
 
             video_path, script_res_data = core_generator.generate_full_video(
                 st.session_state.topic, 
@@ -534,7 +551,7 @@ def render_production_flow(version):
                 pregenerated_script=st.session_state.script_data,
                 target_size=st.session_state.target_size,
                 content_skin=st.session_state.content_genre,
-                video_skin=st.session_state.video_skin,
+                video_skin=v5_video_skin if version == "v5.0.0" else st.session_state.video_skin,
                 pexels_key=active_pexels_key,
                 progress_callback=cb,
                 temp_dir=temp_dir,
@@ -807,7 +824,7 @@ if "v5.0.0" in selected_version:
                     placeholder="예: 구글 크롬 브라우저의 역사와 탄생 비화"
                 )
                 
-                st.markdown("#### ☁️ Google Cloud TTS & Imagen 3 설정")
+                st.markdown("#### ☁️ Google Vertex AI 비주얼 및 성우 설정")
                 
                 st.session_state.v5_gtts_voice = st.selectbox(
                     "구글 프리미엄 한국어 성우 보이스",
@@ -815,8 +832,16 @@ if "v5.0.0" in selected_version:
                     index=0
                 )
                 
+                v5_visual_models = ["Google Imagen 3 (고품질 이미지 + 모션 연출)", "Google Vertex AI Veo 2.0 (시네마틱 동영상 생성)"]
+                st.session_state.v5_visual_model = st.selectbox(
+                    "구글 비주얼 생성 엔진 선택",
+                    v5_visual_models,
+                    index=v5_visual_models.index(st.session_state.v5_visual_model),
+                    help="Imagen 3는 고해상도 이미지를 생성한 후 모션 연출을 가미하며, Veo 2.0은 실제 5초 길이의 고품질 시네마틱 비디오 클립을 Google Cloud 상에서 완전 자체 생성합니다."
+                )
+                
                 st.session_state.v5_imagen_aspect = st.selectbox(
-                    "Google Imagen 3 이미지 비율 프리셋",
+                    "Google 비주얼 종횡비 (Aspect Ratio)",
                     ["9:16 (쇼츠 세로형)", "16:9 (일반 가로형)", "1:1 (정사각형)"],
                     index=0
                 )

@@ -1139,6 +1139,72 @@ def download_imagen_image(prompt, output_path, aspect_ratio="9:16", api_key=None
         raise Exception("Imagen 3 API did not return any generated images.")
 
 
+def download_veo_video(prompt, output_path, aspect_ratio="9:16", api_key=None):
+    """Generate a video clip using Vertex AI / Google GenAI SDK Veo model."""
+    from google import genai
+    from google.genai import types
+    import time
+    
+    k = api_key or os.getenv("GEMINI_API_KEY")
+    if not k:
+        raise ValueError("Google API key (GEMINI_API_KEY) is required for Google Veo.")
+        
+    client = genai.Client(api_key=k)
+    
+    ratio = "9:16"
+    if "16:9" in aspect_ratio:
+        ratio = "16:9"
+    elif "1:1" in aspect_ratio:
+        ratio = "1:1"
+        
+    # Standard Veo preview model
+    model_name = "veo-2.0-generate-001"
+    
+    print(f"[Google Veo] Requesting 5-second video (ratio: {ratio}) for: {prompt[:50]}...")
+    
+    try:
+        operation = client.models.generate_videos(
+            model=model_name,
+            prompt=prompt,
+            config=types.GenerateVideosConfig(
+                aspect_ratio=ratio,
+                duration_seconds=5,
+            )
+        )
+        
+        # Poll status
+        retries = 0
+        max_retries = 60 # Max 5 minutes
+        while not operation.done and retries < max_retries:
+            print(f"[Google Veo] Generating video... (Elapsed: {retries * 5}s)")
+            time.sleep(5)
+            operation = client.operations.get(operation)
+            retries += 1
+            
+        if not operation.done:
+            raise Exception("Google Veo video generation timed out.")
+            
+        if operation.error:
+            raise Exception(f"Google Veo error: {operation.error}")
+            
+        if not operation.response or not operation.response.generated_videos:
+            raise Exception("Google Veo did not return any videos.")
+            
+        generated_video = operation.response.generated_videos[0]
+        
+        # Download file bytes
+        print(f"[Google Veo] Downloading video bytes...")
+        content = client.files.download(file=generated_video.video)
+        with open(output_path, "wb") as f:
+            f.write(content)
+            
+        print(f"[Google Veo] Video generated successfully and saved to {output_path}")
+        return True
+    except Exception as e:
+        print(f"[Google Veo Error] Failed: {e}")
+        raise e
+
+
 def upload_file_to_gcs(local_path, bucket_name, destination_blob_name):
     """Uploads a file to Google Cloud Storage bucket."""
     try:
@@ -1257,7 +1323,10 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
             elif "공포" in content_skin:
                 prompt = f"Dark gothic horror scene, misty, dramatic moonlight, {prompt}, scary, 8k"
                 
-            generate_fal_ai_video(prompt, video_clip_path, is_shorts=is_shorts, api_key=fal_key)
+            if version == "v5.0.0":
+                download_veo_video(prompt, video_clip_path, aspect_ratio="9:16" if is_shorts else "16:9", api_key=gemini_key)
+            else:
+                generate_fal_ai_video(prompt, video_clip_path, is_shorts=is_shorts, api_key=fal_key)
             
             raw_vid_clip = VideoFileClip(video_clip_path)
             if raw_vid_clip.duration < scene_duration:
