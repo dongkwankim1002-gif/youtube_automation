@@ -467,8 +467,9 @@ def generate_voice_over(text, output_path, provider="edge", voice_id=None, api_k
         except Exception as e:
             print(f"[TTS Warning] ElevenLabs TTS failed: {e}. Falling back to Microsoft Edge TTS...")
             
-    # Default to Edge-TTS
-    edge_voice = voice_id if voice_id and voice_id.startswith("ko-KR") and "Neural" in voice_id else "ko-KR-InJoonNeural"
+    # Default to Edge-TTS (only allow valid Edge-TTS voice names)
+    valid_edge_voices = ["ko-KR-InJoonNeural", "ko-KR-SunHiNeural", "ko-KR-HyunminNeural"]
+    edge_voice = voice_id if voice_id in valid_edge_voices else "ko-KR-InJoonNeural"
     generate_tts(text, output_path, voice=edge_voice, rate=rate)
     print(f"[TTS] Microsoft Edge TTS ({edge_voice}) succeeded!")
     return "edge"
