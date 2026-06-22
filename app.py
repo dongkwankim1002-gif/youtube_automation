@@ -199,6 +199,54 @@ if "v5_gcs_bucket" not in st.session_state:
     st.session_state.v5_gcs_bucket = "my-video-factory-bucket"
 if "v5_visual_model" not in st.session_state:
     st.session_state.v5_visual_model = "Google Imagen 3 (고품질 이미지 + 모션 연출)"
+if "v5_active_styles" not in st.session_state:
+    st.session_state.v5_active_styles = ["시네마틱 실사 (Cinematic Realism)"]
+if "v5_style_strengths" not in st.session_state:
+    st.session_state.v5_style_strengths = {
+        "시네마틱 실사 (Cinematic Realism)": 0.8,
+        "코믹/웹툰 (Comic / Webtoon)": 0.7,
+        "뉴스/다큐 보도 (News & Documentary)": 0.7,
+        "호러/미스터리 (Horror & Mystery)": 0.7,
+        "큐티/러블리 (Cute & Lovely)": 0.7,
+        "애니메이션 (Anime / Animation)": 0.7,
+        "역사화 유화 (Historical Oil Painting)": 0.7,
+        "수채화 판타지 (Watercolor Fantasy)": 0.7
+    }
+if "v5_custom_style_desc" not in st.session_state:
+    st.session_state.v5_custom_style_desc = ""
+
+
+def compile_v5_style():
+    style_parts = []
+    for style in st.session_state.v5_active_styles:
+        strength = st.session_state.v5_style_strengths.get(style, 0.7)
+        desc = ""
+        if style == "시네마틱 실사 (Cinematic Realism)":
+            desc = f"cinematic realism movie style (strength: {strength:.1f})"
+        elif style == "코믹/웹툰 (Comic / Webtoon)":
+            desc = f"vibrant comic webtoon art style (strength: {strength:.1f})"
+        elif style == "뉴스/다큐 보도 (News & Documentary)":
+            desc = f"realistic news photojournalism broadcast style (strength: {strength:.1f})"
+        elif style == "호러/미스터리 (Horror & Mystery)":
+            desc = f"dark gothic horror mystery style (strength: {strength:.1f})"
+        elif style == "큐티/러블리 (Cute & Lovely)":
+            desc = f"cute lovely pastel graphic style (strength: {strength:.1f})"
+        elif style == "애니메이션 (Anime / Animation)":
+            desc = f"modern digital 2D anime animation style (strength: {strength:.1f})"
+        elif style == "역사화 유화 (Historical Oil Painting)":
+            desc = f"fine art oil painting canvas texture (strength: {strength:.1f})"
+        elif style == "수채화 판타지 (Watercolor Fantasy)":
+            desc = f"soft watercolor dreamlike fantasy illustration (strength: {strength:.1f})"
+        if desc:
+            style_parts.append(desc)
+            
+    if st.session_state.v5_custom_style_desc.strip():
+        style_parts.append(st.session_state.v5_custom_style_desc.strip())
+        
+    compiled = ", ".join(style_parts)
+    if not compiled:
+        compiled = "cinematic photo style"
+    st.session_state.visual_style = compiled
 
 
 
@@ -846,8 +894,49 @@ if "v5.0.0" in selected_version:
                     index=0
                 )
                 
+                with st.expander("🎨 프리미엄 화풍 커스터마이저 (Visual Style Customizer)", expanded=True):
+                    st.markdown("**1. 다중 화풍 스타일 조합 및 강도 설정**")
+                    all_preset_styles = [
+                        "시네마틱 실사 (Cinematic Realism)",
+                        "코믹/웹툰 (Comic / Webtoon)",
+                        "뉴스/다큐 보도 (News & Documentary)",
+                        "호러/미스터리 (Horror & Mystery)",
+                        "큐티/러블리 (Cute & Lovely)",
+                        "애니메이션 (Anime / Animation)",
+                        "역사화 유화 (Historical Oil Painting)",
+                        "수채화 판타지 (Watercolor Fantasy)"
+                    ]
+                    
+                    st.session_state.v5_active_styles = st.multiselect(
+                        "활성화할 화풍 스타일 (복수 선택 시 혼합 연출)",
+                        all_preset_styles,
+                        default=st.session_state.v5_active_styles
+                    )
+                    
+                    # Strengths sliders for each active style
+                    if st.session_state.v5_active_styles:
+                        st.markdown("*각 스타일의 혼합 강도(Intensity) 조절:*")
+                        for style in st.session_state.v5_active_styles:
+                            current_strength = st.session_state.v5_style_strengths.get(style, 0.7)
+                            st.session_state.v5_style_strengths[style] = st.slider(
+                                f"└ {style} 강도",
+                                min_value=0.0,
+                                max_value=1.0,
+                                value=current_strength,
+                                step=0.1,
+                                key=f"v5_strength_slide_{style}"
+                            )
+                            
+                    st.markdown("**2. 커스텀 화풍 텍스트 직접 입력**")
+                    st.session_state.v5_custom_style_desc = st.text_input(
+                        "추가적인 화풍 묘사나 지시사항을 직접 입력하세요:",
+                        value=st.session_state.v5_custom_style_desc,
+                        placeholder="예: neon cyberpunk atmosphere, volumetric lighting, unreal engine 5 render"
+                    )
+                
                 g_render_btn = st.button("🚀 Google Native 파이프라인 가동!", use_container_width=True, type="primary")
                 if g_render_btn:
+                    compile_v5_style()
                     if st.session_state.v5_sheet_id.strip():
                         with st.spinner("📊 Google Sheets에서 대본 데이터를 불러오는 중..."):
                             try:
@@ -893,6 +982,7 @@ if "v5.0.0" in selected_version:
                 
                 test_render_btn_v5 = st.button("🎬 10초 테스트 영상 즉시 제작", key="test_v5", use_container_width=True)
                 if test_render_btn_v5:
+                    compile_v5_style()
                     test_script = {
                         "title": "10초 시네마틱 테스트 비디오",
                         "description": "버전별 연출 및 자막 렌더링 검증용 10초 테스트 비디오 #테스트 #다큐멘터리",
