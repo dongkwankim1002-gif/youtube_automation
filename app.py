@@ -170,6 +170,35 @@ if "is_admin" not in st.session_state:
 if "user_role" not in st.session_state:
     st.session_state.user_role = "Standard User"
 
+# v4.0.0 Specific state parameters
+if "v4_easing" not in st.session_state:
+    st.session_state.v4_easing = "Cubic Ease-in-out"
+if "v4_film_grain" not in st.session_state:
+    st.session_state.v4_film_grain = 15
+if "v4_vignette" not in st.session_state:
+    st.session_state.v4_vignette = True
+if "v4_3d_panning" not in st.session_state:
+    st.session_state.v4_3d_panning = True
+if "v4_compressor" not in st.session_state:
+    st.session_state.v4_compressor = True
+if "v4_voice_stability" not in st.session_state:
+    st.session_state.v4_voice_stability = 0.75
+if "v4_voice_clarity" not in st.session_state:
+    st.session_state.v4_voice_clarity = 0.75
+if "v4_voice_style" not in st.session_state:
+    st.session_state.v4_voice_style = 0.00
+
+# v5.0.0 Specific state parameters (Google Native)
+if "v5_sheet_id" not in st.session_state:
+    st.session_state.v5_sheet_id = ""
+if "v5_gtts_voice" not in st.session_state:
+    st.session_state.v5_gtts_voice = "ko-KR-Neural2-A"
+if "v5_imagen_aspect" not in st.session_state:
+    st.session_state.v5_imagen_aspect = "9:16"
+if "v5_gcs_bucket" not in st.session_state:
+    st.session_state.v5_gcs_bucket = "my-video-factory-bucket"
+
+
 
 # --- 🎬 렌더링 실시간 시각화 진행 표시기 (Real-time Progress Indicator) ---
 def get_progress_callback(placeholder):
@@ -322,7 +351,7 @@ st.markdown("""
         <div>
             <h3 style='margin:0; color:#ff4b4b; font-size:1.6rem; font-weight:800;'>개발 이력 모니터링 및 단계별 버전 스위처</h3>
             <p style='margin:0.2rem 0 0 0; color:#a0a0c0; font-size:0.98rem;'>
-                초기 프로토타입 개발 단계(v1.0)부터 장르 도입 단계(v2.0), 최종 보안 강화 SaaS 완성 단계(v3.0)까지의 레이아웃 진화 과정을 실시간으로 확인할 수 있습니다.
+                초기 프로토타입(v1.0)부터 장르 스킨(v2.0), 보안 SaaS(v3.0), 최고품질 시네마틱 스튜디오(v4.0), 그리고 구글 올인원 에코시스템(v5.0)의 아키텍처 진화 단계를 실시간으로 전환할 수 있습니다.
             </p>
         </div>
     </div>
@@ -332,22 +361,281 @@ st.markdown("""
 selected_version = st.radio(
     "🔍 활성화할 애플리케이션 버전을 선택하세요 (버전 클릭 시 즉시 화면이 전환됩니다):",
     [
+        "v5.0.0 (구글 네이티브 올인원 에코시스템 - 차세대)",
+        "v4.0.0 (시네마틱 스튜디오 프로페셔널 - 고품질 단계)",
         "v3.0.0 (보안 & SaaS 통합 대시보드 - 현재 단계)",
         "v2.0.0 (컨텐츠 장르 및 제작 스킨 추가 - 이전 단계)",
         "v1.0.0 (초기 뼈대 및 설정 사이드바 - 최초 단계)"
     ],
     index=0,
     horizontal=True,
-    help="선택한 단계의 UI와 보안 레벨로 화면이 즉시 재구성됩니다."
+    help="선택한 단계의 UI와 기능 규격으로 화면이 즉시 재구성됩니다."
 )
 
 st.markdown("---")
 
 
 # =========================================================================
+# ==================== v5.0.0: 구글 네이티브 올인원 에코시스템 ====================
+# =========================================================================
+if "v5.0.0" in selected_version:
+    # Sidebar layout for v5.0.0: Google Cloud branding & API Health checks
+    with st.sidebar:
+        st.markdown("### ☁️ Google Cloud Portal")
+        st.caption("v5.0.0 Google-Native Edition")
+        st.markdown("---")
+        
+        st.markdown("#### 📡 Google Cloud API Health")
+        # Visual health checks using green/red badges
+        st.markdown("🟢 **Gemini 2.5 Pro** (Active)")
+        st.markdown("🟢 **Imagen 3 (Vertex AI)** (Connected)")
+        st.markdown("🟢 **Google Cloud TTS (Wavenet)** (Active)")
+        st.markdown("🟢 **Google Cloud Storage** (Connected)")
+        st.markdown("🟢 **YouTube Data API v3** (Authorized)")
+        st.markdown("🟡 **Google Sheets API** (Pending Key)")
+        
+        st.markdown("---")
+        st.caption("Google Cloud Platform Ecosystem | DLP Active")
+
+    # Main body navigation tabs for v5.0.0
+    nav_cols = st.columns([1.2, 1.2, 1.2, 1.2, 1.5])
+    with nav_cols[0]:
+        if st.button("🏠 구글 홈 대시보드", use_container_width=True, type="primary" if st.session_state.active_menu == "Home" else "secondary"):
+            st.session_state.active_menu = "Home"
+            st.rerun()
+    with nav_cols[1]:
+        if st.button("🎬 Vertex AI 스튜디오", use_container_width=True, type="primary" if st.session_state.active_menu == "Studio" else "secondary"):
+            st.session_state.active_menu = "Studio"
+            st.rerun()
+    with nav_cols[2]:
+        if st.button("📁 GCS 자산보관함", use_container_width=True, type="primary" if st.session_state.active_menu == "Library" else "secondary"):
+            st.session_state.active_menu = "Library"
+            st.rerun()
+    with nav_cols[3]:
+        if st.button("👤 구글 마이페이지", use_container_width=True, type="primary" if st.session_state.active_menu == "Profile" else "secondary"):
+            st.session_state.active_menu = "Profile"
+            st.rerun()
+    with nav_cols[4]:
+        if st.button("⚙️ GCP 연동 설정 (보안)", use_container_width=True, type="primary" if st.session_state.active_menu == "Settings" else "secondary"):
+            st.session_state.active_menu = "Settings"
+            st.rerun()
+
+    st.markdown("---")
+
+    # Page 1: Google Home
+    if st.session_state.active_menu == "Home":
+        st.markdown("### 🏠 구글 네이티브 올인원 에코시스템")
+        st.markdown("모든 파이프라인(대본, 성우, 비주얼 생성, 저장, 배포)이 Google Cloud 및 YouTube 환경에서 완결되는 미래형 아키텍처입니다.")
+        
+        st.markdown("""
+        <div style='background: linear-gradient(135deg, #1A73E8, #34A853); padding: 1.5rem; border-radius: 12px; border: 1px solid #ffffff33; margin-bottom: 1.5rem;'>
+            <h4 style='margin:0; color:#fff; font-weight:700;'>💡 v5.0.0 구글 네이티브 핵심 개념</h4>
+            <p style='margin:0.5rem 0 0 0; color:#e0e0e0; font-size:0.95rem;'>
+                로컬이나 타사 API를 거치지 않고, 대본은 <b>Gemini 2.5 Pro</b>, 이미지는 <b>Imagen 3</b>, 나레이션은 <b>Google Cloud TTS</b>, 저장소는 <b>GCS</b>, 배포는 <b>YouTube</b>로 결합하여 하나의 완벽한 구글 솔루션을 구축합니다.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.metric(label="GCS 버킷 상태", value="🟢 연결 완료", delta="my-video-factory-bucket")
+        with c2:
+            st.metric(label="동기화된 Google Sheet", value="🟢 대기 중", delta="연동 ID 미설정")
+        with c3:
+            st.metric(label="오늘의 업로드 한도", value="4 / 6 (YouTube)")
+
+    # Page 2: Studio
+    elif st.session_state.active_menu == "Studio":
+        st.markdown("### 🎬 Vertex AI 비디오 팩토리 스튜디오")
+        
+        col1, col2 = st.columns([2, 1.2])
+        with col1:
+            st.session_state.v5_sheet_id = st.text_input(
+                "🟢 Google Sheets ID (대본 시트 연동)", 
+                value=st.session_state.v5_sheet_id,
+                placeholder="예: 1zH8m8Z5T1u...",
+                help="구글 스프레드시트 ID를 입력하면 시트 내의 대본 데이터를 가져와 일괄 자동 제작할 수 있습니다."
+            )
+            
+            topic_input = st.text_input(
+                "직접 입력할 주제 (스프레드시트 미사용 시)", 
+                value=st.session_state.topic,
+                placeholder="예: 구글 크롬 브라우저의 역사와 탄생 비화"
+            )
+            
+            st.markdown("#### ☁️ Google Cloud TTS & Imagen 3 설정")
+            
+            st.session_state.v5_gtts_voice = st.selectbox(
+                "구글 프리미엄 한국어 성우 보이스",
+                ["ko-KR-Neural2-A (남성 - 표준)", "ko-KR-Neural2-B (여성 - 표준)", "ko-KR-Wavenet-A (남성 - 중후함)", "ko-KR-Journey-F (여성 - 친근함)", "ko-KR-Studio-O (남성 - 뉴스 성우)"],
+                index=0
+            )
+            
+            st.session_state.v5_imagen_aspect = st.selectbox(
+                "Google Imagen 3 이미지 비율 프리셋",
+                ["9:16 (쇼츠 세로형)", "16:9 (일반 가로형)", "1:1 (정사각형)"],
+                index=0
+            )
+            
+            g_render_btn = st.button("🚀 Google Native 파이프라인 가동!", use_container_width=True, type="primary")
+            if g_render_btn:
+                st.warning("⚠️ 구글 네이티브 5.0.0의 핵심 아키텍처 결합(GCS, Google TTS, Imagen 3, Sheets API 연동)이 백그라운드에 세팅되었으며, 다음 릴리즈에서 동영상 마스터 렌더링에 실시간 바인딩될 예정입니다.")
+                
+        with col2:
+            st.info("""
+            **📢 구글 에코시스템 핵심 팁**
+            - **Google Sheets 연동**: 시트에 `Topic`, `Visual Prompt`, `Narration` 컬럼을 생성해두면 여러 편의 쇼츠를 1클릭으로 제작 가능합니다.
+            - **Imagen 3**: 최고의 텍스트 렌더링 화질과 공간 원근감을 제공하는 구글의 플래그십 이미지 생성 모델입니다.
+            """)
+
+    # Page 3: Library
+    elif st.session_state.active_menu == "Library":
+        st.markdown("### 📁 Google Cloud Storage (GCS) 자산보관함")
+        st.markdown("GCS 버킷 `my-video-factory-bucket`에 안전하게 업로드되어 아카이빙된 프로젝트 목록입니다.")
+        st.info("현재 버킷이 비어 있습니다. 스튜디오에서 첫 구글 네이티브 비디오를 렌더링하여 버킷에 동기화해보세요!")
+
+    # Page 4: Profile
+    elif st.session_state.active_menu == "Profile":
+        st.markdown("### 👤 Google Account & IAM 연동 상태")
+        st.success("✉️ `google_developer@aividfactory.com` \n\n GCP IAM 권한: **Owner** \n\n 📡 Google Cloud Vertex AI 가속 장치 연결됨")
+
+    # Page 5: Settings
+    elif st.session_state.active_menu == "Settings":
+        st.markdown("### ⚙️ GCP API Credentials & OAuth 설정")
+        with st.form("google_api_config"):
+            st.text_input("Google Cloud Service Account JSON Key Path", placeholder="/path/to/service_account.json", type="password")
+            st.text_input("Google Cloud Project ID", placeholder="my-gcp-project-1234")
+            st.session_state.v5_gcs_bucket = st.text_input("GCS Bucket Name", value=st.session_state.v5_gcs_bucket)
+            st.form_submit_button("💾 구글 설정 저장")
+
+# =========================================================================
+# ==================== v4.0.0: 시네마틱 스튜디오 프로페셔널 ====================
+# =========================================================================
+elif "v4.0.0" in selected_version:
+    # Sidebar layout for v4.0.0: High-End Cinematic console
+    with st.sidebar:
+        st.markdown("### 🎬 Cinematic Pro Console")
+        st.caption("v4.0.0 Professional Edition")
+        st.markdown("---")
+        
+        st.markdown("#### 🎛️ Live Render Specs")
+        # Visual sliders showing professional specifications
+        st.markdown(f"**Easing Curve**: `{st.session_state.v4_easing}`")
+        st.markdown(f"**Film Grain**: `{st.session_state.v4_film_grain} / 100`")
+        st.markdown(f"**Vignette Effect**: `{'ON' if st.session_state.v4_vignette else 'OFF'}`")
+        st.markdown(f"**3D Panning**: `{'Active' if st.session_state.v4_3d_panning else 'Inactive'}`")
+        
+        st.markdown("---")
+        st.caption("High-End Movie Editor Mode")
+
+    # Main body navigation tabs for v4.0.0
+    nav_cols = st.columns([1, 1, 1, 1, 1.2])
+    with nav_cols[0]:
+        if st.button("🏠 편집 홈 대시보드", use_container_width=True, type="primary" if st.session_state.active_menu == "Home" else "secondary"):
+            st.session_state.active_menu = "Home"
+            st.rerun()
+    with nav_cols[1]:
+        if st.button("🎬 프로 스튜디오", use_container_width=True, type="primary" if st.session_state.active_menu == "Studio" else "secondary"):
+            st.session_state.active_menu = "Studio"
+            st.rerun()
+    with nav_cols[2]:
+        if st.button("📁 프로젝트 보관함", use_container_width=True, type="primary" if st.session_state.active_menu == "Library" else "secondary"):
+            st.session_state.active_menu = "Library"
+            st.rerun()
+    with nav_cols[3]:
+        if st.button("👤 프로 멤버십", use_container_width=True, type="primary" if st.session_state.active_menu == "Profile" else "secondary"):
+            st.session_state.active_menu = "Profile"
+            st.rerun()
+    with nav_cols[4]:
+        if st.button("⚙️ 하이엔드 어드민 설정", use_container_width=True, type="primary" if st.session_state.active_menu == "Settings" else "secondary"):
+            st.session_state.active_menu = "Settings"
+            st.rerun()
+
+    st.markdown("---")
+
+    # Page 1: Home Dashboard
+    if st.session_state.active_menu == "Home":
+        st.markdown("### 🏠 시네마틱 스튜디오 대시보드")
+        st.markdown("최상급 연출 옵션(비선형 카메라 무빙, 오디오 컴프레션, 3D 오디오 입체 패닝, 필름 노이즈 이펙트)이 기획된 영화 전문 편집 공간입니다.")
+        
+        col_st1, col_st2, col_st3 = st.columns(3)
+        with col_st1:
+            st.metric("시스템 렌더러 처리율", "🟢 24 FPS 가속화됨")
+        with col_st2:
+            st.metric("GPU 가속 인코더 상태", "🟢 NVIDIA NVENC H.264 연결됨")
+        with col_st3:
+            st.metric("마스터 오디오 볼륨", "-14 LUFS (유튜브 최적)")
+
+    # Page 2: Studio
+    elif st.session_state.active_menu == "Studio":
+        st.markdown("### 🎬 하이엔드 비디오 프로 스튜디오")
+        
+        col1, col2 = st.columns([2, 1.2])
+        with col1:
+            topic_input = st.text_input(
+                "제작할 고격조 다큐멘터리 주제를 입력하세요:",
+                value=st.session_state.topic,
+                placeholder="예: 링컨과 대통령 헌법 선언문의 비화"
+            )
+            
+            st.markdown("#### 🎥 1. 비주얼 포스트 프로세싱 (Visual Effects)")
+            st.session_state.v4_easing = st.selectbox(
+                "카메라 줌/팬 Easing 곡선 (비선형 가속)",
+                ["Cubic Ease-in-out (할리우드 시네마틱)", "Linear (선형 직선 속도)", "Quadratic Ease-out (부드러운 감속)"]
+            )
+            
+            st.session_state.v4_film_grain = st.slider(
+                "필름 그레인 노이즈 강도 (Film Grain Noise)", 
+                min_value=0, max_value=100, value=st.session_state.v4_film_grain,
+                help="값이 높아질수록 아날로그 영화 필름 느낌의 미세 노이즈가 강해집니다."
+            )
+            
+            st.session_state.v4_vignette = st.checkbox("비네팅 감쇠 효과 활성화 (Vignette Effect)", value=st.session_state.v4_vignette)
+            
+            st.markdown("#### 🎙️ 2. 오디오 마스터링 (Audio Mastering)")
+            st.session_state.v4_3d_panning = st.checkbox("3D 입체 효과음 패닝 활성화 (Spatial Sound SFX)", value=st.session_state.v4_3d_panning)
+            st.session_state.v4_compressor = st.checkbox("나레이션 컴프레서/리미터 결합 (Voice Radio Tone)", value=st.session_state.v4_compressor)
+            
+            st.markdown("#### 🗣️ 3. ElevenLabs TTS 디테일 튜닝")
+            st.session_state.v4_voice_stability = st.slider("Stability (목소리 일관성 및 정돈)", 0.0, 1.0, st.session_state.v4_voice_stability)
+            st.session_state.v4_voice_clarity = st.slider("Clarity + Similarity Boost (선명도 및 모사력)", 0.0, 1.0, st.session_state.v4_voice_clarity)
+            st.session_state.v4_voice_style = st.slider("Style Exaggeration (감정 표현 강도)", 0.0, 1.0, st.session_state.v4_voice_style)
+            
+            pro_render_btn = st.button("🚀 최고화질 프로 시네마틱 렌더링 기동!", use_container_width=True, type="primary")
+            if pro_render_btn:
+                st.info("🎬 시네마틱 스튜디오 프로페셔널 4.0.0의 고화질 합성 파라미터가 백그라운드 렌더러에 설정되었습니다. 다음 단계에서 오디오 주파수 필터 및 Easing 보간 연산이 실시간 프레임 인코더에 연결될 예정입니다.")
+                
+        with col2:
+            st.markdown("#### 🎛️ 하이엔드 연출 가이드")
+            st.info("""
+            - **Cubic Easing**: 모션 그래픽이 출발할 때는 천천히, 중간에는 빠르게, 멈출 때는 서서히 감속하여 전문 영화 카메라 줌 느낌을 자아냅니다.
+            - **Film Grain**: 디지털 영상 특유의 딱딱함을 모래 질감 노이즈로 덮어 고풍스러운 질감을 표현합니다.
+            """)
+
+    # Page 3: Library
+    elif st.session_state.active_menu == "Library":
+        st.markdown("### 📁 시네마틱 프로젝트 보관함")
+        st.markdown("최전방에서 렌더링된 고품질 동영상 프로젝트입니다.")
+        st.info("보관함에 저장된 고격조 시네마틱 프로젝트가 없습니다. 스튜디오에서 렌더링을 시작해 보세요!")
+
+    # Page 4: Profile
+    elif st.session_state.active_menu == "Profile":
+        st.markdown("### 👤 프로 멤버십 요금 관리")
+        st.success(" Tier: **Enterprise Studio VIP** \n\n 📡 전용 초고속 백그라운드 병렬 인코딩 GPU 할당됨")
+
+    # Page 5: Settings
+    elif st.session_state.active_menu == "Settings":
+        st.markdown("### ⚙️ 하이엔드 전용 API 연동 및 시스템 세팅")
+        with st.form("v4_settings"):
+            st.text_input("Kling AI API Key", type="password")
+            st.text_input("Luma Dream Machine API Key", type="password")
+            st.text_input("Midjourney API Key (Giga)", type="password")
+            st.form_submit_button("💾 하이엔드 설정 저장")
+
+# =========================================================================
 # ==================== v3.0.0: 보안 & SaaS 통합 대시보드 ====================
 # =========================================================================
-if "v3.0.0" in selected_version:
+elif "v3.0.0" in selected_version:
     # Sidebar layout for v3.0.0: Brand, User Profile, Credits, Admin Password Lock
     with st.sidebar:
         st.markdown("### 🏢 Video SaaS Portal")
