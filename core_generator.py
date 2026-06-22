@@ -501,12 +501,14 @@ def generate_script_from_gemini(topic, is_shorts=True, character_desc="", visual
     """Use Gemini 2.5 Pro to structure a high-fidelity cinematic script containing visual, camera, BGM, and SFX directives."""
     from google import genai
     
-    if not GEMINI_API_KEY:
-        raise ValueError("GEMINI_API_KEY is not configured in .env file.")
+    # Read fresh key from environment since module-level variables are static
+    k = os.getenv("GEMINI_API_KEY") or GEMINI_API_KEY
+    if not k:
+        raise ValueError("GEMINI_API_KEY is not configured.")
         
     os.environ.pop("GOOGLE_APPLICATION_CREDENTIALS", None)
     
-    client = genai.Client(api_key=GEMINI_API_KEY)
+    client = genai.Client(api_key=k)
     
     duration_guide = "1분 이내 (쇼츠 포맷, 씬 4~5개 분량)" if is_shorts else "5분 내외 (일반 영상 포맷, 씬 10~15개 분량)"
     layout_guide = "세로형 (9:16)" if is_shorts else "가로형 (16:9)"
@@ -560,23 +562,37 @@ def generate_script_from_gemini(topic, is_shorts=True, character_desc="", visual
     }}
     """
     
-    max_retries = 3
+    models_to_try = ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash']
     response_text = ""
-    for attempt in range(max_retries):
-        try:
-            response = client.models.generate_content(
-                model='gemini-2.5-pro',
-                contents=prompt
-            )
-            response_text = response.text.strip()
+    success = False
+    
+    for model_name in models_to_try:
+        max_retries = 2
+        for attempt in range(max_retries):
+            try:
+                print(f"[Gemini API] Attempting script generation with model: {model_name} (Attempt {attempt+1}/{max_retries})...")
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=prompt
+                )
+                response_text = response.text.strip()
+                success = True
+                break
+            except Exception as e:
+                err_msg = str(e)
+                is_transient = "503" in err_msg or "429" in err_msg or "UNAVAILABLE" in err_msg or "RESOURCE_EXHAUSTED" in err_msg
+                if is_transient and attempt < max_retries - 1:
+                    wait_time = 2 ** attempt
+                    print(f"[Warning] Gemini API busy or limit hit ({e}). Retrying in {wait_time} seconds...")
+                    time.sleep(wait_time)
+                else:
+                    print(f"[Warning] Model {model_name} failed: {e}")
+                    break  # Try next model in fallback list
+        if success:
             break
-        except Exception as e:
-            if ("503" in str(e) or "429" in str(e)) and attempt < max_retries - 1:
-                wait_time = 2 ** attempt
-                print(f"[Warning] Gemini API busy ({e}). Retrying in {wait_time} seconds...")
-                time.sleep(wait_time)
-            else:
-                raise e
+            
+    if not success:
+        raise Exception("All fallback Gemini models (2.5-pro, 2.5-flash, 2.0-flash, 1.5-flash) failed or were unavailable due to high demand/quota.")
     
     if response_text.startswith("```json"):
         response_text = re.sub(r"^```json\s*", "", response_text)
