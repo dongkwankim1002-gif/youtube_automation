@@ -1335,12 +1335,12 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
             prompt = scene_data.get("visual_prompt", "A dramatic cinematic scene")
             if visual_style and visual_style.strip():
                 prompt = f"{prompt}, {visual_style.strip()}"
-            
-            # Apply global visual style guidelines for AI video prompt
-            if "역사" in content_skin:
-                prompt = f"Moody historical oil painting style, dark academia, dramatic chiaroscuro, {prompt}, cinematic, 8k"
-            elif "공포" in content_skin:
-                prompt = f"Dark gothic horror scene, misty, dramatic moonlight, {prompt}, scary, 8k"
+            else:
+                # Apply global visual style guidelines for AI video prompt only if no visual_style is active
+                if "역사" in content_skin:
+                    prompt = f"Moody historical oil painting style, dark academia, dramatic chiaroscuro, {prompt}, cinematic, 8k"
+                elif "공포" in content_skin:
+                    prompt = f"Dark gothic horror scene, misty, dramatic moonlight, {prompt}, scary, 8k"
                 
             if version == "v5.0.0":
                 download_veo_video(prompt, video_clip_path, aspect_ratio="9:16" if is_shorts else "16:9", api_key=gemini_key)
@@ -1393,15 +1393,16 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
     if visual_clip is None:
         prompt = scene_data.get("visual_prompt", "A dramatic cinematic scene")
         if visual_style and visual_style.strip():
+            # If visual_style is active, we bypass the hardcoded content skin styles to let user customizer options take full effect
             prompt = f"{prompt}, {visual_style.strip()}"
-        
-        # Apply global visual style guidelines dynamically for AI images
-        if "역사" in content_skin:
-            prompt = f"Masterpiece, oil painting style, dark academia atmosphere, dramatic chiaroscuro lighting, deep contrast:1.2, {prompt}, moody historical illustration, highly detailed, cinematic texture, 8k, muted colors, soft vignetting"
-        elif "공포" in content_skin:
-            prompt = f"Dark gothic horror illustration, misty foggy atmosphere, dramatic moonlight, spooky shadows, {prompt}, masterpiece, 8k, highly detailed, chilling ambiance"
-        elif "소설" in content_skin:
-            prompt = f"Fantasy watercolor illustration, soft dreamlike warm light, pastel color palette, emotional scenery, {prompt}, masterpiece, highly detailed, fairytale aesthetic"
+        else:
+            # Apply global visual style guidelines dynamically for AI images only if no visual_style is active
+            if "역사" in content_skin:
+                prompt = f"Masterpiece, oil painting style, dark academia atmosphere, dramatic chiaroscuro lighting, deep contrast:1.2, {prompt}, moody historical illustration, highly detailed, cinematic texture, 8k, muted colors, soft vignetting"
+            elif "공포" in content_skin:
+                prompt = f"Dark gothic horror illustration, misty foggy atmosphere, dramatic moonlight, spooky shadows, {prompt}, masterpiece, 8k, highly detailed, chilling ambiance"
+            elif "소설" in content_skin:
+                prompt = f"Fantasy watercolor illustration, soft dreamlike warm light, pastel color palette, emotional scenery, {prompt}, masterpiece, highly detailed, fairytale aesthetic"
             
         generate_cinematic_image(prompt, img_path, is_shorts=is_shorts, provider=image_provider, fal_key=fal_key, openai_key=openai_key, gemini_key=gemini_key)
         
