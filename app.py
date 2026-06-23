@@ -916,10 +916,17 @@ if "v5.0.0" in selected_version:
                 
                 st.markdown("#### ☁️ Google Vertex AI 비주얼 및 성우 설정")
                 
+                v5_voices = ["ko-KR-Neural2-A (남성 - 표준)", "ko-KR-Neural2-B (여성 - 표준)", "ko-KR-Wavenet-A (남성 - 중후함)", "ko-KR-Journey-F (여성 - 친근함)", "ko-KR-Studio-O (남성 - 뉴스 성우)"]
+                voice_idx = 0
+                for idx, v_opt in enumerate(v5_voices):
+                    if st.session_state.v5_gtts_voice in v_opt or v_opt.startswith(st.session_state.v5_gtts_voice):
+                        voice_idx = idx
+                        break
                 st.session_state.v5_gtts_voice = st.selectbox(
                     "구글 프리미엄 한국어 성우 보이스",
-                    ["ko-KR-Neural2-A (남성 - 표준)", "ko-KR-Neural2-B (여성 - 표준)", "ko-KR-Wavenet-A (남성 - 중후함)", "ko-KR-Journey-F (여성 - 친근함)", "ko-KR-Studio-O (남성 - 뉴스 성우)"],
-                    index=0
+                    v5_voices,
+                    index=voice_idx,
+                    key="v5_gtts_voice_widget"
                 )
                 
                 v5_visual_models = ["Google Imagen 3 (고품질 이미지 + 모션 연출)", "Google Vertex AI Veo 2.0 (시네마틱 동영상 생성)"]
@@ -927,13 +934,21 @@ if "v5.0.0" in selected_version:
                     "구글 비주얼 생성 엔진 선택",
                     v5_visual_models,
                     index=v5_visual_models.index(st.session_state.v5_visual_model),
+                    key="v5_visual_model_widget",
                     help="Imagen 3는 고해상도 이미지를 생성한 후 모션 연출을 가미하며, Veo 2.0은 실제 5초 길이의 고품질 시네마틱 비디오 클립을 Google Cloud 상에서 완전 자체 생성합니다."
                 )
                 
+                v5_aspects = ["9:16 (쇼츠 세로형)", "16:9 (일반 가로형)", "1:1 (정사각형)"]
+                aspect_idx = 0
+                for idx, a_opt in enumerate(v5_aspects):
+                    if st.session_state.v5_imagen_aspect in a_opt:
+                        aspect_idx = idx
+                        break
                 st.session_state.v5_imagen_aspect = st.selectbox(
                     "Google 비주얼 종횡비 (Aspect Ratio)",
-                    ["9:16 (쇼츠 세로형)", "16:9 (일반 가로형)", "1:1 (정사각형)"],
-                    index=0
+                    v5_aspects,
+                    index=aspect_idx,
+                    key="v5_imagen_aspect_widget"
                 )
                 
                 with st.expander("🎨 프리미엄 화풍 커스터마이저 (Visual Style Customizer)", expanded=True):
@@ -1203,9 +1218,17 @@ elif "v4.0.0" in selected_version:
                 )
                 
                 st.markdown("#### 🎥 1. 비주얼 포스트 프로세싱 (Visual Effects)")
+                v4_easings = ["Cubic Ease-in-out (할리우드 시네마틱)", "Linear (선형 직선 속도)", "Quadratic Ease-out (부드러운 감속)"]
+                easing_idx = 0
+                for idx, e_opt in enumerate(v4_easings):
+                    if st.session_state.v4_easing in e_opt:
+                        easing_idx = idx
+                        break
                 st.session_state.v4_easing = st.selectbox(
                     "카메라 줌/팬 Easing 곡선 (비선형 가속)",
-                    ["Cubic Ease-in-out (할리우드 시네마틱)", "Linear (선형 직선 속도)", "Quadratic Ease-out (부드러운 감속)"]
+                    v4_easings,
+                    index=easing_idx,
+                    key="v4_easing_widget"
                 )
                 
                 st.session_state.v4_film_grain = st.slider(
