@@ -1297,7 +1297,8 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
                       v4_easing="Linear", v4_3d_panning=False,
                       v4_voice_stability=0.75, v4_voice_clarity=0.75, v4_voice_style=0.0,
                       gemini_key=None,
-                      version="v3.0.0"):
+                      version="v3.0.0",
+                      visual_style=""):
     """Render a single scene: merges narration audio, visuals based on selected technical skin, subtitles, and SFX."""
     print(f"[Scene {scene_idx}] Rendering scene with skin: {video_skin} (Easing: {v4_easing}, Panning: {v4_3d_panning})...")
     
@@ -1332,6 +1333,8 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
         try:
             video_clip_path = os.path.join(temp_dir, f"video_{scene_idx}.mp4")
             prompt = scene_data.get("visual_prompt", "A dramatic cinematic scene")
+            if visual_style and visual_style.strip():
+                prompt = f"{prompt}, {visual_style.strip()}"
             
             # Apply global visual style guidelines for AI video prompt
             if "역사" in content_skin:
@@ -1381,12 +1384,16 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
     elif "Option 5" in video_skin: # Typography (Abstract background)
         # Generate abstract background image
         bg_prompt = "Abstract elegant liquid gradient background, smooth dark colors, high resolution, minimalist"
+        if visual_style and visual_style.strip():
+            bg_prompt = f"{bg_prompt}, {visual_style.strip()}"
         generate_cinematic_image(bg_prompt, img_path, is_shorts=is_shorts, provider=image_provider, fal_key=fal_key, openai_key=openai_key, gemini_key=gemini_key)
         visual_clip = make_ken_burns_clip(img_path, scene_duration, target_size=target_size, movement_type="zoom_in", speed="slow", easing=v4_easing)
         
     # Default fallback / Option 1 / Option 4 background
     if visual_clip is None:
         prompt = scene_data.get("visual_prompt", "A dramatic cinematic scene")
+        if visual_style and visual_style.strip():
+            prompt = f"{prompt}, {visual_style.strip()}"
         
         # Apply global visual style guidelines dynamically for AI images
         if "역사" in content_skin:
@@ -1580,7 +1587,8 @@ def generate_full_video(topic, is_shorts=True, output_filename="final_output.mp4
             v4_easing=v4_easing, v4_3d_panning=v4_3d_panning,
             v4_voice_stability=v4_voice_stability, v4_voice_clarity=v4_voice_clarity, v4_voice_style=v4_voice_style,
             gemini_key=os.getenv("GEMINI_API_KEY"),
-            version=version
+            version=version,
+            visual_style=visual_style
         )
         scene_clips.append(clip)
         

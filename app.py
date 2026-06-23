@@ -626,7 +626,8 @@ def render_production_flow(version):
                 v4_voice_clarity=v4_clarity,
                 v4_voice_style=v4_style,
                 v5_gcs_bucket=v5_gcs_bucket,
-                version=version
+                version=version,
+                visual_style=st.session_state.visual_style
             )
             
             st.session_state.script_data = script_res_data
@@ -1001,6 +1002,9 @@ if "v5.0.0" in selected_version:
                                     import core_generator
                                     active_gemini_key = st.session_state.api_gemini if st.session_state.api_gemini else gemini_key
                                     os.environ["GEMINI_API_KEY"] = active_gemini_key
+                                    
+                                    # Compile visual style selection before script generation
+                                    compile_v5_style()
                                     
                                     script_data = core_generator.generate_script_from_gemini(
                                         st.session_state.topic, 
