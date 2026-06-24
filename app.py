@@ -917,7 +917,7 @@ if "v6.0.0" in selected_version:
         st.markdown("""
         <div style='background-color: #ff4b4b22; border: 2px solid #ff4b4b; padding: 1.2rem; border-radius: 10px; margin-bottom: 1.5rem;'>
             <h4 style='color: #ff4b4b; margin-top: 0;'>⚠️ 경고: 과도한 API 호출 비용 주의</h4>
-            <p style='color: #ffea00; font-weight: bold; margin-bottom: 0; font-size: 1.0rem;'>
+            <p style='color: #ff6e6e; font-weight: bold; margin-bottom: 0; font-size: 1.0rem;'>
                 <b>Omni-Veo 멀티모달 생성 모드</b>는 구글의 최첨단 비디오 생성 API(Veo 2.0) 및 대형 멀티모달 모델을 사용하므로, 
                 <b>일반 이미지 생성 대비 수십 배 이상의 API 호출 비용이 발생할 수 있습니다.</b> 동영상 길이 및 씬 수에 비례하여 비용이 급증하므로 신중하게 실행해 주시기 바랍니다.
             </p>
@@ -941,7 +941,7 @@ if "v6.0.0" in selected_version:
             st.markdown("""
             <div style='background-color: #ff4b4b22; border: 2px solid #ff4b4b; padding: 1.2rem; border-radius: 10px; margin-bottom: 1.5rem;'>
                 <h4 style='color: #ff4b4b; margin-top: 0; font-weight: 800;'>⚠️ 경고: Veo 및 Omni 멀티모달 파이프라인은 높은 API 호출 비용을 수반하므로 신중히 실행해 주십시오.</h4>
-                <p style='color: #ffea00; font-weight: bold; margin-bottom: 0; font-size: 1.0rem;'>
+                <p style='color: #ff6e6e; font-weight: bold; margin-bottom: 0; font-size: 1.0rem;'>
                     Veo 2.0 모델은 고성능의 5초 단위 물리적 시네마틱 영상들을 Google Cloud 상에서 실시간 생성하므로, 생성 요청 시 API 청구 비용이 크게 늘어날 수 있습니다.
                 </p>
             </div>
@@ -1155,7 +1155,7 @@ if "v6.0.0" in selected_version:
         st.markdown("""
         <div style='background-color: #ff4b4b22; border: 2px solid #ff4b4b; padding: 1.2rem; border-radius: 10px; margin-bottom: 1.5rem;'>
             <h4 style='color: #ff4b4b; margin-top: 0; font-weight: 800;'>⚠️ 경고: Veo 및 Omni 멀티모달 파이프라인은 높은 API 호출 비용을 수반하므로 신중히 실행해 주십시오.</h4>
-            <p style='color: #ffea00; font-weight: bold; margin-bottom: 0; font-size: 1.0rem;'>
+            <p style='color: #ff6e6e; font-weight: bold; margin-bottom: 0; font-size: 1.0rem;'>
                 Veo 2.0 모델은 고성능의 5초 단위 물리적 시네마틱 영상들을 Google Cloud 상에서 실시간 생성하므로, 생성 요청 시 API 청구 비용이 크게 늘어날 수 있습니다.
             </p>
         </div>
