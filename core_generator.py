@@ -497,7 +497,7 @@ def generate_voice_over(text, output_path, provider="edge", voice_id=None, api_k
     return "edge"
 
 
-def generate_script_from_gemini(topic, is_shorts=True, character_desc="", visual_style="", content_skin="🎬 역사 다큐멘터리 (Historical Documentary)"):
+def generate_script_from_gemini(topic, is_shorts=True, character_desc="", visual_style="", content_skin="🎬 역사 다큐멘터리 (Historical Documentary)", scene_count=None, total_duration=None):
     """Use Gemini 2.5 Pro to structure a high-fidelity cinematic script containing visual, camera, BGM, and SFX directives."""
     from google import genai
     
@@ -510,7 +510,10 @@ def generate_script_from_gemini(topic, is_shorts=True, character_desc="", visual
     
     client = genai.Client(api_key=k)
     
-    duration_guide = "1분 이내 (쇼츠 포맷, 씬 4~5개 분량)" if is_shorts else "5분 내외 (일반 영상 포맷, 씬 10~15개 분량)"
+    if scene_count is not None:
+        duration_guide = f"목표 재생 시간 {total_duration or 60}초 내외 (반드시 정확히 {scene_count}개 씬 분량)"
+    else:
+        duration_guide = "1분 이내 (쇼츠 포맷, 씬 4~5개 분량)" if is_shorts else "5분 내외 (일반 영상 포맷, 씬 10~15개 분량)"
     layout_guide = "세로형 (9:16)" if is_shorts else "가로형 (16:9)"
     
     # Retrieve configuration for selected skin
@@ -526,6 +529,16 @@ def generate_script_from_gemini(topic, is_shorts=True, character_desc="", visual
     if visual_style:
         consistency_guide += f"\n- 비주얼 화풍 및 아트 스타일: {visual_style}\n  (중요: 모든 씬의 'visual_prompt'는 이 비주얼 화풍 가이드라인을 반영하여 통일성 있게 묘사해 주십시오.)"
     
+    scene_constraint = ""
+    if scene_count is not None:
+        target_scene_dur = (total_duration or 60) / scene_count
+        target_chars = int(target_scene_dur * 12)
+        scene_constraint = f"""
+        [🚨 초비상 씬 개수 제약 조건]:
+        - 생성할 'scenes' 배열의 원소 개수는 **반드시 정확히 {scene_count}개**여야 합니다. 많거나 적어서는 절대로 안 됩니다.
+        - 각 씬의 나레이션은 느린 발화 기준 약 {target_scene_dur:.1f}초에 맞도록 **공백 포함 {target_chars}자 내외 (2~3문장 이내)**로 작성해 주십시오.
+        """
+
     prompt = f"""
     당신은 {persona}입니다.
     주제: "{topic}"에 대해 시청자가 숨을 죽이고 몰입할 수 있는 최고의 시네마틱 비디오 시나리오를 설계해 주세요.
@@ -533,6 +546,7 @@ def generate_script_from_gemini(topic, is_shorts=True, character_desc="", visual
     영상 비율: {layout_guide}
     기본 비주얼 연출 스타일: {recommended_visual}
     {consistency_guide}
+    {scene_constraint}
 
     [대본 구성 및 연출 지침 (Minimal History Style)]:
     1. 인트로 훅 (Scene 1): 일반적인 상식이나 당연한 것에 의문을 제기하는 강렬한 미스터리 질문으로 시작하여 시청자를 사로잡으십시오. (예: "혈액형은 단순히 병원에서 확인하는 수혈용 정보가 아닙니다. 그것은 수백만 년 동안...")
@@ -566,6 +580,7 @@ def generate_script_from_gemini(topic, is_shorts=True, character_desc="", visual
     response_text = ""
     success = False
     
+    errors_encountered = []
     for model_name in models_to_try:
         max_retries = 2
         for attempt in range(max_retries):
@@ -580,6 +595,7 @@ def generate_script_from_gemini(topic, is_shorts=True, character_desc="", visual
                 break
             except Exception as e:
                 err_msg = str(e)
+                errors_encountered.append(f"{model_name}: {err_msg}")
                 is_transient = "503" in err_msg or "429" in err_msg or "UNAVAILABLE" in err_msg or "RESOURCE_EXHAUSTED" in err_msg
                 if is_transient and attempt < max_retries - 1:
                     wait_time = 2 ** attempt
@@ -592,7 +608,8 @@ def generate_script_from_gemini(topic, is_shorts=True, character_desc="", visual
             break
             
     if not success:
-        raise Exception("All fallback Gemini models (2.5-pro, 2.5-flash, 2.0-flash, 1.5-flash) failed or were unavailable due to high demand/quota.")
+        detailed_error = "; ".join(set(errors_encountered))
+        raise Exception(f"All fallback Gemini models (2.5-pro, 2.5-flash, 2.0-flash, 1.5-flash) failed or were unavailable due to high demand/quota. Details: {detailed_error}")
     
     if response_text.startswith("```json"):
         response_text = re.sub(r"^```json\s*", "", response_text)
@@ -752,14 +769,14 @@ def download_pollinations_image(prompt, output_path, is_shorts=True):
     return False
 
 
-def generate_cinematic_image(prompt, output_path, is_shorts=True, provider="pollinations", fal_key=None, openai_key=None, gemini_key=None):
+def generate_cinematic_image(prompt, output_path, is_shorts=True, provider="pollinations", fal_key=None, openai_key=None, gemini_key=None, seed=None):
     """Download or generate high-quality images with selection of provider and robust fallback to Pollinations."""
     success = False
     
     if provider == "google":
         try:
             aspect_ratio = "9:16" if is_shorts else "16:9"
-            success = download_imagen_image(prompt, output_path, aspect_ratio=aspect_ratio, api_key=gemini_key)
+            success = download_imagen_image(prompt, output_path, aspect_ratio=aspect_ratio, api_key=gemini_key, seed=seed)
         except Exception as e:
             print(f"[Image Warning] Google Imagen 3 generation failed: {e}. Falling back to Pollinations...")
             
@@ -1117,7 +1134,7 @@ def apply_compressor_filter(audio_clip, threshold=0.15, ratio=4.0, makeup_gain=1
     return audio_clip.fl(compressor)
 
 
-def download_imagen_image(prompt, output_path, aspect_ratio="9:16", api_key=None):
+def download_imagen_image(prompt, output_path, aspect_ratio="9:16", api_key=None, seed=None):
     """Generate an image using Vertex AI / Google GenAI SDK Imagen 3 model."""
     from google import genai
     
@@ -1135,15 +1152,31 @@ def download_imagen_image(prompt, output_path, aspect_ratio="9:16", api_key=None
         
     print(f"[Imagen 3] Requesting image (ratio: {ratio}) for: {prompt[:50]}...")
     
-    result = client.models.generate_images(
-        model='imagen-3.0-generate-002',
-        prompt=prompt,
-        config=dict(
-            number_of_images=1,
-            output_mime_type="image/jpeg",
-            aspect_ratio=ratio,
+    config_kwargs = {
+        "number_of_images": 1,
+        "output_mime_type": "image/jpeg",
+        "aspect_ratio": ratio,
+    }
+    if seed is not None:
+        config_kwargs["seed"] = seed
+        
+    try:
+        result = client.models.generate_images(
+            model='imagen-3.0-generate-002',
+            prompt=prompt,
+            config=dict(**config_kwargs)
         )
-    )
+    except Exception as e:
+        if seed is not None and "seed" in str(e).lower():
+            print(f"[Imagen 3 Warning] Seed parameter not supported in this API mode. Retrying without seed...")
+            config_kwargs.pop("seed", None)
+            result = client.models.generate_images(
+                model='imagen-3.0-generate-002',
+                prompt=prompt,
+                config=dict(**config_kwargs)
+            )
+        else:
+            raise e
     
     if result.generated_images:
         img_bytes = result.generated_images[0].image.image_bytes
@@ -1155,7 +1188,7 @@ def download_imagen_image(prompt, output_path, aspect_ratio="9:16", api_key=None
         raise Exception("Imagen 3 API did not return any generated images.")
 
 
-def download_veo_video(prompt, output_path, aspect_ratio="9:16", api_key=None):
+def download_veo_video(prompt, output_path, aspect_ratio="9:16", api_key=None, input_image_path=None):
     """Generate a video clip using Vertex AI / Google GenAI SDK Veo model."""
     from google import genai
     from google.genai import types
@@ -1179,14 +1212,28 @@ def download_veo_video(prompt, output_path, aspect_ratio="9:16", api_key=None):
     print(f"[Google Veo] Requesting 5-second video (ratio: {ratio}) for: {prompt[:50]}...")
     
     try:
-        operation = client.models.generate_videos(
-            model=model_name,
-            prompt=prompt,
-            config=types.GenerateVideosConfig(
+        image_obj = None
+        if input_image_path and os.path.exists(input_image_path):
+            try:
+                with open(input_image_path, "rb") as f:
+                    img_bytes = f.read()
+                image_obj = types.Image(image_bytes=img_bytes)
+                print(f"[Google Veo] Using reference image {input_image_path} for character/object consistency.")
+            except Exception as img_err:
+                print(f"[Google Veo Warning] Failed to bind reference image: {img_err}")
+
+        api_kwargs = {
+            "model": model_name,
+            "prompt": prompt,
+            "config": types.GenerateVideosConfig(
                 aspect_ratio=ratio,
                 duration_seconds=5,
             )
-        )
+        }
+        if image_obj is not None:
+            api_kwargs["image"] = image_obj
+
+        operation = client.models.generate_videos(**api_kwargs)
         
         # Poll status
         retries = 0
@@ -1298,7 +1345,10 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
                       v4_voice_stability=0.75, v4_voice_clarity=0.75, v4_voice_style=0.0,
                       gemini_key=None,
                       version="v3.0.0",
-                      visual_style=""):
+                      visual_style="",
+                      seed=None,
+                      input_image_path=None,
+                      character_desc=""):
     """Render a single scene: merges narration audio, visuals based on selected technical skin, subtitles, and SFX."""
     print(f"[Scene {scene_idx}] Rendering scene with skin: {video_skin} (Easing: {v4_easing}, Panning: {v4_3d_panning})...")
     
@@ -1333,6 +1383,9 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
         try:
             video_clip_path = os.path.join(temp_dir, f"video_{scene_idx}.mp4")
             prompt = scene_data.get("visual_prompt", "A dramatic cinematic scene")
+            if version == "v6.0.0" and character_desc and character_desc.strip():
+                prompt = f"Featuring the character: {character_desc.strip()}, {prompt}"
+                
             if visual_style and visual_style.strip():
                 prompt = f"{prompt}, {visual_style.strip()}"
             else:
@@ -1342,8 +1395,8 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
                 elif "공포" in content_skin:
                     prompt = f"Dark gothic horror scene, misty, dramatic moonlight, {prompt}, scary, 8k"
                 
-            if version == "v5.0.0":
-                download_veo_video(prompt, video_clip_path, aspect_ratio="9:16" if is_shorts else "16:9", api_key=gemini_key)
+            if version in ["v5.0.0", "v6.0.0"]:
+                download_veo_video(prompt, video_clip_path, aspect_ratio="9:16" if is_shorts else "16:9", api_key=gemini_key, input_image_path=input_image_path)
             else:
                 generate_fal_ai_video(prompt, video_clip_path, is_shorts=is_shorts, api_key=fal_key)
             
@@ -1386,12 +1439,15 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
         bg_prompt = "Abstract elegant liquid gradient background, smooth dark colors, high resolution, minimalist"
         if visual_style and visual_style.strip():
             bg_prompt = f"{bg_prompt}, {visual_style.strip()}"
-        generate_cinematic_image(bg_prompt, img_path, is_shorts=is_shorts, provider=image_provider, fal_key=fal_key, openai_key=openai_key, gemini_key=gemini_key)
+        generate_cinematic_image(bg_prompt, img_path, is_shorts=is_shorts, provider=image_provider, fal_key=fal_key, openai_key=openai_key, gemini_key=gemini_key, seed=seed)
         visual_clip = make_ken_burns_clip(img_path, scene_duration, target_size=target_size, movement_type="zoom_in", speed="slow", easing=v4_easing)
         
     # Default fallback / Option 1 / Option 4 background
     if visual_clip is None:
         prompt = scene_data.get("visual_prompt", "A dramatic cinematic scene")
+        if version == "v6.0.0" and character_desc and character_desc.strip():
+            prompt = f"Featuring the character: {character_desc.strip()}, {prompt}"
+            
         if visual_style and visual_style.strip():
             # If visual_style is active, we bypass the hardcoded content skin styles to let user customizer options take full effect
             prompt = f"{prompt}, {visual_style.strip()}"
@@ -1404,7 +1460,7 @@ def build_scene_video(scene_idx, scene_data, is_shorts=True,
             elif "소설" in content_skin:
                 prompt = f"Fantasy watercolor illustration, soft dreamlike warm light, pastel color palette, emotional scenery, {prompt}, masterpiece, highly detailed, fairytale aesthetic"
             
-        generate_cinematic_image(prompt, img_path, is_shorts=is_shorts, provider=image_provider, fal_key=fal_key, openai_key=openai_key, gemini_key=gemini_key)
+        generate_cinematic_image(prompt, img_path, is_shorts=is_shorts, provider=image_provider, fal_key=fal_key, openai_key=openai_key, gemini_key=gemini_key, seed=seed)
         
         cam_info = scene_data.get("camera_movement", {})
         cam_type = cam_info.get("type", "zoom_in")
@@ -1571,6 +1627,34 @@ def generate_full_video(topic, is_shorts=True, output_filename="final_output.mp4
         script_data = generate_script_from_gemini(topic, is_shorts, character_desc, visual_style, content_skin)
         print(f"[Script] Script Generated! Title: {script_data['title']}")
     
+    # v6.0.0: Initialize global seed and character reference image for consistency
+    v6_seed = None
+    ref_image_path = None
+    if version == "v6.0.0":
+        import random
+        v6_seed = random.randint(1, 999999)
+        print(f"[v6.0.0] Initialized global seed {v6_seed} for character consistency.")
+        
+        if character_desc and character_desc.strip():
+            ref_image_path = os.path.join(temp_dir, "character_reference_base.jpg")
+            print(f"[v6.0.0] Generating base character reference image using Imagen 3...")
+            ref_prompt = f"A clear full body portrait of the character: {character_desc.strip()}, simple clean background, studio lighting, detailed character design, {visual_style}"
+            try:
+                generate_cinematic_image(
+                    ref_prompt, 
+                    ref_image_path, 
+                    is_shorts=is_shorts, 
+                    provider=image_provider, 
+                    fal_key=fal_key, 
+                    openai_key=openai_key, 
+                    gemini_key=tts_api_key, 
+                    seed=v6_seed
+                )
+                print(f"[v6.0.0] Base character reference image saved at {ref_image_path}")
+            except Exception as e:
+                print(f"[v6.0.0 Warning] Failed to generate dedicated character reference: {e}")
+                ref_image_path = None
+                
     # 2. Build individual scene video clips
     scene_clips = []
     scenes_timeline = []
@@ -1579,6 +1663,19 @@ def generate_full_video(topic, is_shorts=True, output_filename="final_output.mp4
     for i, scene in enumerate(script_data["scenes"]):
         if progress_callback:
             progress_callback("SCENE", i, len(script_data["scenes"]))
+            
+        # Determine character reference image path for v6.0.0
+        scene_ref_path = None
+        if version == "v6.0.0":
+            if ref_image_path and os.path.exists(ref_image_path):
+                scene_ref_path = ref_image_path
+            else:
+                # Fallback: if no dedicated reference image, use the first scene's image as reference for subsequent scenes
+                if i > 0:
+                    first_scene_img = os.path.join(temp_dir, "visual_0.jpg")
+                    if os.path.exists(first_scene_img):
+                        scene_ref_path = first_scene_img
+                        
         clip, narr_duration = build_scene_video(
             i, scene, is_shorts=is_shorts,
             tts_provider=tts_provider, tts_voice_id=tts_voice_id, tts_api_key=tts_api_key,
@@ -1589,7 +1686,10 @@ def generate_full_video(topic, is_shorts=True, output_filename="final_output.mp4
             v4_voice_stability=v4_voice_stability, v4_voice_clarity=v4_voice_clarity, v4_voice_style=v4_voice_style,
             gemini_key=os.getenv("GEMINI_API_KEY"),
             version=version,
-            visual_style=visual_style
+            visual_style=visual_style,
+            seed=v6_seed,
+            input_image_path=scene_ref_path,
+            character_desc=character_desc
         )
         scene_clips.append(clip)
         

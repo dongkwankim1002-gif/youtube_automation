@@ -217,6 +217,47 @@ if "v5_style_strengths" not in st.session_state:
 if "v5_custom_style_desc" not in st.session_state:
     st.session_state.v5_custom_style_desc = ""
 
+# v6.0.0 Specific state parameters (Omni-Veo Multimodal)
+if "v6_duration_seconds" not in st.session_state:
+    st.session_state.v6_duration_seconds = 60
+if "v6_scene_count" not in st.session_state:
+    st.session_state.v6_scene_count = 10
+if "v6_style_preset" not in st.session_state:
+    st.session_state.v6_style_preset = "시네마틱 실사 영화 🎬"
+if "v6_style_intensity" not in st.session_state:
+    st.session_state.v6_style_intensity = 0.8
+if "v6_custom_style_desc" not in st.session_state:
+    st.session_state.v6_custom_style_desc = ""
+if "v6_character_desc" not in st.session_state:
+    st.session_state.v6_character_desc = ""
+
+
+def compile_v6_style():
+    preset = st.session_state.v6_style_preset
+    strength = st.session_state.v6_style_intensity
+    desc = ""
+    if preset == "시네마틱 실사 영화 🎬":
+        desc = f"cinematic realism movie style, high detailed dramatic lighting (strength: {strength:.1f})"
+    elif preset == "코믹/웹툰 스타일 🎨":
+        desc = f"vibrant comic book webtoon art style, bold outlines (strength: {strength:.1f})"
+    elif preset == "2D 애니메이션 🧸":
+        desc = f"modern digital 2D anime animation style, studio ghibli aesthetic (strength: {strength:.1f})"
+    elif preset == "역사화 유화 🖌️":
+        desc = f"fine art oil painting canvas texture, classical historical painting (strength: {strength:.1f})"
+    elif preset == "수채화 판타지 🔮":
+        desc = f"soft watercolor dreamlike fantasy illustration, magical atmosphere (strength: {strength:.1f})"
+    elif preset == "네온 사이버펑크 🌌":
+        desc = f"cyberpunk city night scene, neon glowing lights, volumetric mist (strength: {strength:.1f})"
+    
+    style_parts = [desc] if desc else []
+    if st.session_state.v6_custom_style_desc.strip():
+        style_parts.append(st.session_state.v6_custom_style_desc.strip())
+        
+    compiled = ", ".join(style_parts)
+    if not compiled:
+        compiled = "cinematic photo style"
+    st.session_state.visual_style = compiled
+
 
 def compile_v5_style():
     style_parts = []
@@ -551,7 +592,16 @@ def render_production_flow(version):
             v5_video_skin = st.session_state.video_skin
             
             # Set up parameters based on version selection
-            if version == "v4.0.0":
+            if version == "v6.0.0":
+                tts_provider = "google"
+                tts_voice_id = "ko-KR-Neural2-A"
+                image_provider = "google"
+                v5_gcs_bucket = ""
+                v5_video_skin = "Option 2: AI 비디오 직접 생성 (Google Veo)"
+                st.session_state.is_shorts = True
+                st.session_state.target_size = (540, 960)
+                
+            elif version == "v4.0.0":
                 v4_easing = st.session_state.v4_easing
                 v4_film_grain = st.session_state.v4_film_grain
                 v4_vignette = st.session_state.v4_vignette
@@ -612,8 +662,9 @@ def render_production_flow(version):
                 openai_key=active_openai_key,
                 pregenerated_script=st.session_state.script_data,
                 target_size=st.session_state.target_size,
+                character_desc=st.session_state.v6_character_desc if version == "v6.0.0" else st.session_state.character_desc,
                 content_skin=st.session_state.content_genre,
-                video_skin=v5_video_skin if version == "v5.0.0" else st.session_state.video_skin,
+                video_skin=v5_video_skin if version in ["v5.0.0", "v6.0.0"] else st.session_state.video_skin,
                 pexels_key=active_pexels_key,
                 progress_callback=cb,
                 temp_dir=temp_dir,
@@ -694,7 +745,7 @@ def render_production_flow(version):
         except Exception as e:
             st.error(f"❌ 영상 제작 중 오류 발생: {e}")
             err_msg = str(e)
-            if version == "v5.0.0" and ("429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg or "credits are depleted" in err_msg):
+            if version in ["v5.0.0", "v6.0.0"] and ("429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg or "credits are depleted" in err_msg):
                 st.warning("⚠️ **Gemini API 키 오류 감지**: 구글 AI 스튜디오 선불 크레딧이 부족합니다. 결제 상태를 확인하거나 새 API 키를 등록하세요.")
                 new_key = st.text_input("🔑 새로운 Gemini API Key 입력:", type="password", key=f"new_gemini_key_render_{version}")
                 if st.button("💾 API Key 업데이트 및 저장", key=f"save_key_render_{version}", use_container_width=True, type="primary"):
@@ -788,7 +839,7 @@ st.markdown("""
         <div>
             <h3 style='margin:0; color:#ff4b4b; font-size:1.6rem; font-weight:800;'>개발 이력 모니터링 및 단계별 버전 스위처</h3>
             <p style='margin:0.2rem 0 0 0; color:#a0a0c0; font-size:0.98rem;'>
-                초기 프로토타입(v1.0)부터 장르 스킨(v2.0), 보안 SaaS(v3.0), 최고품질 시네마틱 스튜디오(v4.0), 그리고 구글 올인원 에코시스템(v5.0)의 아키텍처 진화 단계를 실시간으로 전환할 수 있습니다.
+                초기 프로토타입(v1.0)부터 장르 스킨(v2.0), 보안 SaaS(v3.0), 최고품질 시네마틱 스튜디오(v4.0), 구글 올인원 에코시스템(v5.0), 그리고 최첨단 Omni-Veo 멀티모달 프레임워크(v6.0)까지의 아키텍처 진화 단계를 실시간으로 전환할 수 있습니다.
             </p>
         </div>
     </div>
@@ -798,6 +849,7 @@ st.markdown("""
 selected_version = st.radio(
     "🔍 활성화할 애플리케이션 버전을 선택하세요 (버전 클릭 시 즉시 화면이 전환됩니다):",
     [
+        "v6.0.0 (Omni-Veo 멀티모달 프레임워크 - 최첨단 단계)",
         "v5.0.0 (구글 네이티브 올인원 에코시스템 - 차세대)",
         "v4.0.0 (시네마틱 스튜디오 프로페셔널 - 고품질 단계)",
         "v3.0.0 (보안 & SaaS 통합 대시보드 - 현재 단계)",
@@ -813,9 +865,315 @@ st.markdown("---")
 
 
 # =========================================================================
+# ==================== v6.0.0: Omni-Veo 멀티모달 프레임워크 ====================
+# =========================================================================
+if "v6.0.0" in selected_version:
+    # Sidebar layout for v6.0.0
+    with st.sidebar:
+        st.markdown("### 🌌 Omni-Veo Portal")
+        st.caption("v6.0.0 Multimodal Generation")
+        st.markdown("---")
+        
+        st.markdown("#### 📡 Google Cloud API Status")
+        st.markdown("🟢 **Gemini Omni (2.5 Pro)** (Active)")
+        st.markdown("🟢 **Google Veo 2.0 (Video)** (Connected)")
+        st.markdown("🟢 **Google Cloud TTS (Neural2)** (Active)")
+        st.markdown("🟢 **Google Cloud Storage** (Connected)")
+        st.markdown("🟢 **YouTube Data API v3** (Authorized)")
+        
+        st.markdown("---")
+        st.caption("Google Cloud Platform Ecosystem | DLP Active")
+
+    # Main body navigation tabs for v6.0.0
+    nav_cols = st.columns([1.2, 1.2, 1.2, 1.2, 1.5])
+    with nav_cols[0]:
+        if st.button("🏠 비오 홈 대시보드", use_container_width=True, type="primary" if st.session_state.active_menu == "Home" else "secondary", key="v6_menu_home"):
+            st.session_state.active_menu = "Home"
+            st.rerun()
+    with nav_cols[1]:
+        if st.button("🎬 Omni-Veo 스튜디오", use_container_width=True, type="primary" if st.session_state.active_menu == "Studio" else "secondary", key="v6_menu_studio"):
+            st.session_state.active_menu = "Studio"
+            st.rerun()
+    with nav_cols[2]:
+        if st.button("📁 클라우드 자산 보관소", use_container_width=True, type="primary" if st.session_state.active_menu == "Library" else "secondary", key="v6_menu_library"):
+            st.session_state.active_menu = "Library"
+            st.rerun()
+    with nav_cols[3]:
+        if st.button("👤 마이 계정 포털", use_container_width=True, type="primary" if st.session_state.active_menu == "Profile" else "secondary", key="v6_menu_profile"):
+            st.session_state.active_menu = "Profile"
+            st.rerun()
+    with nav_cols[4]:
+        if st.button("⚙️ 멀티모달 연동 설정", use_container_width=True, type="primary" if st.session_state.active_menu == "Settings" else "secondary", key="v6_menu_settings"):
+            st.session_state.active_menu = "Settings"
+            st.rerun()
+
+    st.markdown("---")
+
+    # Page 1: Home Dashboard for v6.0.0
+    if st.session_state.active_menu == "Home":
+        st.markdown("### 🏠 Omni-Veo 멀티모달 프레임워크 홈")
+        st.markdown("Google의 최첨단 영상 생성 모델 Veo 시리즈와 Gemini Omni의 통합 멀티모달 인지 능력을 결합한 최상위 비디오 엔지니어링 스튜디오입니다.")
+        
+        st.markdown("""
+        <div style='background-color: #ff4b4b22; border: 2px solid #ff4b4b; padding: 1.2rem; border-radius: 10px; margin-bottom: 1.5rem;'>
+            <h4 style='color: #ff4b4b; margin-top: 0;'>⚠️ 경고: 과도한 API 호출 비용 주의</h4>
+            <p style='color: #ffffff; margin-bottom: 0; font-size: 0.95rem;'>
+                <b>Omni-Veo 멀티모달 생성 모드</b>는 구글의 최첨단 비디오 생성 API(Veo 2.0) 및 대형 멀티모달 모델을 사용하므로, 
+                <b>일반 이미지 생성 대비 수십 배 이상의 API 호출 비용이 발생할 수 있습니다.</b> 동영상 길이 및 씬 수에 비례하여 비용이 급증하므로 신중하게 실행해 주시기 바랍니다.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.metric(label="Veo API 상태", value="🟢 대기 중", delta="veo-2.0-generate-001")
+        with c2:
+            st.metric(label="Gemini Omni 모델", value="🟢 2.5 Pro", delta="gemini-2.5-pro")
+        with c3:
+            st.metric(label="일관성 엔진", value="🟢 활성화됨", delta="Image Reference + Seed")
+
+    # Page 2: Studio for v6.0.0
+    elif st.session_state.active_menu == "Studio":
+        if st.session_state.step == "input":
+            st.markdown("### 🎬 Omni-Veo 스튜디오 - 기획 및 초기 설정")
+            
+            # Display prominent Cost Warning Banner at the top of the Studio Input page
+            st.markdown("""
+            <div style='background-color: #ff4b4b22; border: 2px solid #ff4b4b; padding: 1.2rem; border-radius: 10px; margin-bottom: 1.5rem;'>
+                <h4 style='color: #ff4b4b; margin-top: 0; font-weight: 800;'>⚠️ 경고: Veo 및 Omni 멀티모달 파이프라인은 높은 API 호출 비용을 수반하므로 신중히 실행해 주십시오.</h4>
+                <p style='color: #ffffff; margin-bottom: 0; font-size: 0.95rem;'>
+                    Veo 2.0 모델은 고성능의 5초 단위 물리적 시네마틱 영상들을 Google Cloud 상에서 실시간 생성하므로, 생성 요청 시 API 청구 비용이 크게 늘어날 수 있습니다.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            col1, col2 = st.columns([2, 1.2])
+            with col1:
+                if st.session_state.gemini_exhausted:
+                    st.error("🚨 **Gemini API 키 크레딧 소진**: 구글 AI 스튜디오 선불 크레딧이 소진되었거나 호출 한도가 초과되었습니다.")
+                    new_key = st.text_input("🔑 새로운 Gemini API Key 입력:", type="password", key="new_gemini_key_input_v6")
+                    if st.button("💾 API Key 업데이트 및 저장", key="save_key_input_v6", use_container_width=True, type="primary"):
+                        if new_key.strip():
+                            st.session_state.api_gemini = new_key.strip()
+                            st.session_state.gemini_exhausted = False
+                            st.success("API Key가 업데이트되었습니다! 다시 생성을 시도해 주세요.")
+                            time.sleep(1.2)
+                            st.rerun()
+                        else:
+                            st.warning("유효한 API Key를 입력해 주세요.")
+                
+                topic_input = st.text_input(
+                    "🎥 제작할 비디오의 주제를 입력하세요:",
+                    value=st.session_state.topic,
+                    placeholder="예: 구글 크롬 브라우저의 역사와 탄생 비화"
+                )
+                
+                character_input = st.text_area(
+                    "👤 주요 캐릭터 및 핵심 물체 묘사 (100% 일관성 유지용):",
+                    value=st.session_state.v6_character_desc,
+                    placeholder="예: A 30-year-old male scientist with messy silver hair, round glasses, wearing a white laboratory coat",
+                    help="여기에 묘사한 캐릭터는 모든 씬의 이미지 및 비디오 생성 프롬프트에 자동으로 주입되며, 첫 프레임의 Imagen 3 레퍼런스 이미지 생성 후 Veo 2.0 API의 input_image로 전달되어 100% 비주얼 아이덴티티가 일관되게 유지됩니다."
+                )
+                st.session_state.v6_character_desc = character_input
+                
+                st.markdown("#### ⏱️ 영상 재생 시간 및 씬 개수 연동 설정")
+                st.markdown("비주얼 및 대본 연출 로직의 충돌을 방지하기 위해, 영상 시간과 씬 개수를 사전에 확정하여 대본을 생성합니다.")
+                
+                # Dynamic Linkage: Duration & Recommended Scene Count
+                duration_val = st.slider(
+                    "영상 총 길이 설정 (초 단위, 최대 3분)",
+                    min_value=10,
+                    max_value=180,
+                    value=st.session_state.v6_duration_seconds,
+                    step=5,
+                    key="v6_duration_slider"
+                )
+                st.session_state.v6_duration_seconds = duration_val
+                
+                # Calculate recommended scene range
+                min_scenes = max(2, int(duration_val // 8))
+                max_scenes = max(4, int(duration_val // 5))
+                
+                st.info(f"💡 설정한 영상 길이 **{duration_val}초** 대비 **권장 씬 범위: {min_scenes}개 ~ {max_scenes}개** 입니다. (씬당 약 5~8초 소요)")
+                
+                selected_scenes = st.slider(
+                    "대본 생성 씬 개수 선택",
+                    min_value=2,
+                    max_value=max(30, max_scenes),
+                    value=min(st.session_state.v6_scene_count, max(30, max_scenes)),
+                    step=1,
+                    key="v6_scenes_slider"
+                )
+                st.session_state.v6_scene_count = selected_scenes
+                
+                st.markdown("#### 🎨 직관적인 단일 화풍 커스터마이저")
+                style_presets = [
+                    "시네마틱 실사 영화 🎬", 
+                    "코믹/웹툰 스타일 🎨", 
+                    "2D 애니메이션 🧸", 
+                    "역사화 유화 🖌️", 
+                    "수채화 판타지 🔮", 
+                    "네온 사이버펑크 🌌"
+                ]
+                selected_preset = st.selectbox(
+                    "적용할 대표 화풍 스타일을 선택하세요:",
+                    style_presets,
+                    index=style_presets.index(st.session_state.v6_style_preset),
+                    key="v6_preset_widget"
+                )
+                st.session_state.v6_style_preset = selected_preset
+                
+                intensity_val = st.slider(
+                    "화풍 스타일 반영 강도 (Intensity)",
+                    min_value=0.0,
+                    max_value=1.0,
+                    value=st.session_state.v6_style_intensity,
+                    step=0.1,
+                    key="v6_intensity_widget"
+                )
+                st.session_state.v6_style_intensity = intensity_val
+                
+                custom_style_val = st.text_input(
+                    "추가 커스텀 화풍 설명 (영문, 선택사항):",
+                    value=st.session_state.v6_custom_style_desc,
+                    placeholder="예: volumetric light, 8k resolution, photorealistic",
+                    key="v6_custom_desc_widget"
+                )
+                st.session_state.v6_custom_style_desc = custom_style_val
+                
+                st.markdown("---")
+                
+                v6_render_btn = st.button("🚀 Omni-Veo 멀티모달 대본 생성!", use_container_width=True, type="primary")
+                if v6_render_btn:
+                    if not topic_input.strip():
+                        st.error("비디오 제작 주제를 입력해 주세요.")
+                    else:
+                        st.session_state.topic = topic_input
+                        with st.spinner("🧠 Gemini Omni가 총길이 및 씬 제약 조건에 맞추어 시네마틱 대본을 설계하는 중..."):
+                            try:
+                                import core_generator
+                                active_gemini_key = st.session_state.api_gemini if st.session_state.api_gemini else gemini_key
+                                os.environ["GEMINI_API_KEY"] = active_gemini_key
+                                
+                                # Compile style
+                                compile_v6_style()
+                                
+                                # Call pre-generation with upfront specifications to avoid timeline mismatch
+                                script_data = core_generator.generate_script_from_gemini(
+                                    st.session_state.topic, 
+                                    is_shorts=st.session_state.is_shorts, 
+                                    character_desc=st.session_state.v6_character_desc, 
+                                    visual_style=st.session_state.visual_style,
+                                    content_skin=st.session_state.content_genre,
+                                    scene_count=st.session_state.v6_scene_count,
+                                    total_duration=st.session_state.v6_duration_seconds
+                                )
+                                st.session_state.script_data = script_data
+                                st.session_state.step = "edit"
+                                st.success("🎉 목표 제약조건에 최적화된 시네마틱 대본이 빌드되었습니다!")
+                                time.sleep(1)
+                                st.rerun()
+                            except Exception as e:
+                                err_msg = str(e)
+                                if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg or "credits are depleted" in err_msg:
+                                    st.session_state.gemini_exhausted = True
+                                st.error(f"대본 생성 실패: {e}")
+                                
+                st.markdown("---")
+                st.markdown("### 🧪 10초 쾌속 테스트 코너 (Test Corner)")
+                st.caption("대본 생성 및 편집 단계를 건너뛰고, 미리 준비된 10초 분량(2개 씬)의 다큐멘터리 대본으로 즉시 영상 제작 파이프라인을 가동하여 자막 레이아웃, 목소리, 비주얼 화풍을 테스트합니다.")
+                
+                test_render_btn_v6 = st.button("🎬 10초 테스트 영상 즉시 제작", key="test_v6", use_container_width=True)
+                if test_render_btn_v6:
+                    compile_v6_style()
+                    test_script = {
+                        "title": "10초 시네마틱 테스트 비디오",
+                        "description": "버전별 연출 및 자막 렌더링 검증용 10초 테스트 비디오 #테스트 #다큐멘터리",
+                        "tags": ["테스트", "다큐멘터리", "시네마틱"],
+                        "overall_bgm_mood": "dark_mystery",
+                        "scenes": [
+                            {
+                                "narration": "역사의 위대한 전설은 아주 작은 시작에서 탄생합니다.",
+                                "visual_prompt": "A majestic cinematic sunrise over ancient mountains, detailed oil painting style, 8k",
+                                "camera_movement": {"type": "zoom_in", "speed": "slow"},
+                                "sfx_trigger": "none",
+                                "sfx_timing": "start"
+                            },
+                            {
+                                "narration": "시간의 흐름 속에서, 그 가치는 영원히 기억될 것입니다.",
+                                "visual_prompt": "An hourglass on a researcher's wooden table, warm study room, dramatic chiaroscuro, 8k",
+                                "camera_movement": {"type": "zoom_out", "speed": "slow"},
+                                "sfx_trigger": "none",
+                                "sfx_timing": "start"
+                            }
+                        ]
+                    }
+                    st.session_state.script_data = test_script
+                    st.session_state.topic = "10초 시네마틱 테스트 비디오"
+                    st.session_state.step = "render"
+                    st.success("⚡ 테스트용 대본 로드 완료! 렌더링 파이프라인으로 이동합니다.")
+                    time.sleep(1)
+                    st.rerun()
+
+            with col2:
+                st.info("""
+                **💡 v6.0.0 Omni-Veo 팁**
+                - **주인공 캐릭터 묘사**: 캐릭터의 외형(머리색, 복장, 액세서리)을 최대한 세부적으로 묘사할수록, 씬들 간에 캐릭터가 완전히 일관되게 생성됩니다.
+                - **초기 세팅**: 제목, 재생 시간, 화풍을 먼저 세팅하고 대본을 빌드하므로, 대본 완성 후 시간 불일치로 인한 씬 꼬임 현상이 없습니다.
+                - **API 요금**: 비디오 생성 API(Veo)는 높은 리소스를 소모하므로 테스트 용도로는 '10초 테스트 영상 제작' 기능을 우선 활용하는 것을 권장합니다.
+                """)
+        else:
+            render_production_flow("v6.0.0")
+
+    # Page 3: Library for v6.0.0
+    elif st.session_state.active_menu == "Library":
+        st.markdown("### 📁 Omni-Veo 프로젝트 보관소")
+        st.markdown("최종 렌더링이 완료된 mp4 동영상 목록입니다.")
+        st.markdown("---")
+        
+        # Local fallback video files rendering
+        video_files = [f for f in os.listdir(".") if f.endswith(".mp4") and os.path.isfile(f) and f != "test_shorts.mp4"]
+        if not video_files:
+            st.info("보관소에 저장된 동영상 프로젝트가 없습니다. 스튜디오에서 렌더링을 시작해 보세요!")
+        else:
+            video_files.sort(key=os.path.getmtime, reverse=True)
+            for idx, video_file in enumerate(video_files):
+                with st.container(border=True):
+                    st.markdown(f"##### 🎥 파일명: `{video_file}`")
+                    st.video(video_file)
+
+    # Page 4: Profile for v6.0.0
+    elif st.session_state.active_menu == "Profile":
+        st.markdown("### 👤 Google Account & IAM 포털")
+        st.success("✉️ `google_developer@aividfactory.com` \n\n GCP IAM 권한: **Owner / Vertex AI Administrator** \n\n 📡 Google Cloud Vertex AI Veo 2.0 가속 장치 연결됨")
+
+    # Page 5: Settings for v6.0.0
+    elif st.session_state.active_menu == "Settings":
+        st.markdown("### ⚙️ 멀티모달 연동 및 Google Studio API Key 관리")
+        
+        # Display prominent Cost Warning Banner in Settings page
+        st.markdown("""
+        <div style='background-color: #ff4b4b22; border: 2px solid #ff4b4b; padding: 1.2rem; border-radius: 10px; margin-bottom: 1.5rem;'>
+            <h4 style='color: #ff4b4b; margin-top: 0; font-weight: 800;'>⚠️ 경고: Veo 및 Omni 멀티모달 파이프라인은 높은 API 호출 비용을 수반하므로 신중히 실행해 주십시오.</h4>
+            <p style='color: #ffffff; margin-bottom: 0; font-size: 0.95rem;'>
+                Veo 2.0 모델은 고성능의 5초 단위 물리적 시네마틱 영상들을 Google Cloud 상에서 실시간 생성하므로, 생성 요청 시 API 청구 비용이 크게 늘어날 수 있습니다.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        with st.form("v6_settings"):
+            gemini_key_input = st.text_input("Gemini / Vertex AI API Key", value=st.session_state.api_gemini, type="password", placeholder="AIzaSy...")
+            submitted = st.form_submit_button("💾 구글 연동 설정 저장")
+            if submitted:
+                st.session_state.api_gemini = gemini_key_input.strip()
+                st.session_state.gemini_exhausted = False
+                st.success("💾 Google Cloud 및 Gemini API Key가 저장되었습니다!")
+
+
+# =========================================================================
 # ==================== v5.0.0: 구글 네이티브 올인원 에코시스템 ====================
 # =========================================================================
-if "v5.0.0" in selected_version:
+elif "v5.0.0" in selected_version:
     # Sidebar layout for v5.0.0: Google Cloud branding & API Health checks
     with st.sidebar:
         st.markdown("### ☁️ Google Cloud Portal")
