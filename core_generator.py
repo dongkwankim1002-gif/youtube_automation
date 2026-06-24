@@ -1272,9 +1272,22 @@ def upload_file_to_gcs(local_path, bucket_name, destination_blob_name):
     """Uploads a file to Google Cloud Storage bucket."""
     try:
         from google.cloud import storage
+        from google.oauth2 import service_account
+        import json
         print(f"[GCS] Uploading {local_path} to bucket '{bucket_name}' as '{destination_blob_name}'...")
         
-        storage_client = storage.Client()
+        sa_json = os.getenv("GCP_SERVICE_ACCOUNT_JSON")
+        if sa_json:
+            try:
+                info = json.loads(sa_json)
+                credentials = service_account.Credentials.from_service_account_info(info)
+                storage_client = storage.Client(credentials=credentials, project=info.get("project_id"))
+            except Exception as e_sa:
+                print(f"[GCS Warning] Failed to parse GCP_SERVICE_ACCOUNT_JSON: {e_sa}. Falling back to default credentials...")
+                storage_client = storage.Client()
+        else:
+            storage_client = storage.Client()
+            
         bucket = storage_client.bucket(bucket_name)
         blob = bucket.blob(destination_blob_name)
         

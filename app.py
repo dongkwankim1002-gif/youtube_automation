@@ -106,6 +106,21 @@ fal_key = os.getenv("FAL_API_KEY", "") or os.getenv("FAL_KEY", "")
 openai_key = os.getenv("OPENAI_API_KEY", "")
 pexels_key = os.getenv("PEXELS_API_KEY", "")
 
+def get_gcs_client():
+    from google.cloud import storage
+    from google.oauth2 import service_account
+    import json
+    
+    sa_json = os.getenv("GCP_SERVICE_ACCOUNT_JSON")
+    if sa_json:
+        try:
+            info = json.loads(sa_json)
+            credentials = service_account.Credentials.from_service_account_info(info)
+            return storage.Client(credentials=credentials, project=info.get("project_id"))
+        except Exception as e_sa:
+            print(f"[GCS Warning] Failed to parse GCP_SERVICE_ACCOUNT_JSON: {e_sa}")
+    return storage.Client()
+
 # --- GLOBAL SESSION STATE INITIALIZATION ---
 if "step" not in st.session_state:
     st.session_state.step = "input"
@@ -596,7 +611,7 @@ def render_production_flow(version):
                 tts_provider = "google"
                 tts_voice_id = "ko-KR-Neural2-A"
                 image_provider = "google"
-                v5_gcs_bucket = ""
+                v5_gcs_bucket = os.getenv("GCS_BUCKET_NAME") or st.session_state.v5_gcs_bucket or "my-video-factory-bucket"
                 v5_video_skin = "Option 2: AI 비디오 직접 생성 (Google Veo)"
                 st.session_state.is_shorts = True
                 st.session_state.target_size = (540, 960)
@@ -1128,19 +1143,42 @@ if "v6.0.0" in selected_version:
     # Page 3: Library for v6.0.0
     elif st.session_state.active_menu == "Library":
         st.markdown("### 📁 Omni-Veo 프로젝트 보관소")
-        st.markdown("최종 렌더링이 완료된 mp4 동영상 목록입니다.")
+        bucket_name = os.getenv("GCS_BUCKET_NAME") or st.session_state.v5_gcs_bucket or "my-video-factory-bucket"
+        st.markdown(f"GCS 버킷 `{bucket_name}`에 업로드되어 아카이빙된 프로젝트 목록입니다.")
         st.markdown("---")
         
-        # Local fallback video files rendering
-        video_files = [f for f in os.listdir(".") if f.endswith(".mp4") and os.path.isfile(f) and f != "test_shorts.mp4"]
-        if not video_files:
-            st.info("보관소에 저장된 동영상 프로젝트가 없습니다. 스튜디오에서 렌더링을 시작해 보세요!")
-        else:
-            video_files.sort(key=os.path.getmtime, reverse=True)
-            for idx, video_file in enumerate(video_files):
-                with st.container(border=True):
-                    st.markdown(f"##### 🎥 파일명: `{video_file}`")
-                    st.video(video_file)
+        try:
+            storage_client = get_gcs_client()
+            bucket = storage_client.bucket(bucket_name)
+            blobs = list(bucket.list_blobs(max_results=20))
+            mp4_blobs = [b for b in blobs if b.name.endswith(".mp4")]
+            if mp4_blobs:
+                for idx, blob in enumerate(mp4_blobs):
+                    with st.container(border=True):
+                        col_g1, col_g2 = st.columns([2, 1.2])
+                        with col_g1:
+                            st.write(f"🎥 **블롭명**: `{blob.name}`")
+                            st.video(blob.public_url)
+                        with col_g2:
+                            st.write(f"📦 **크기**: {blob.size / (1024 * 1024):.2f} MB")
+                            st.write(f"📅 **업데이트**: {blob.updated}")
+                            st.markdown(f"🔗 [GCS 퍼블릭 링크]({blob.public_url})")
+            else:
+                st.info("☁️ GCS 버킷 내에 업로드된 mp4 동영상이 없습니다. 스튜디오에서 첫 비디오를 렌더링해보세요!")
+        except Exception as e:
+            st.warning(f"⚠️ GCS 버킷 파일 목록 조회 실패 (오프라인 로컬 폴백 작동): {e}")
+            st.markdown("---")
+            st.markdown("##### 📁 로컬에 저장된 동영상 목록:")
+            # Local fallback video files rendering
+            video_files = [f for f in os.listdir(".") if f.endswith(".mp4") and os.path.isfile(f) and f != "test_shorts.mp4"]
+            if video_files:
+                video_files.sort(key=os.path.getmtime, reverse=True)
+                for idx, video_file in enumerate(video_files):
+                    with st.container(border=True):
+                        st.markdown(f"##### 🎥 파일명: `{video_file}`")
+                        st.video(video_file)
+            else:
+                st.info("보관소에 저장된 동영상 프로젝트가 없습니다. 스튜디오에서 렌더링을 시작해 보세요!")
 
     # Page 4: Profile for v6.0.0
     elif st.session_state.active_menu == "Profile":
@@ -1449,7 +1487,7 @@ elif "v5.0.0" in selected_version:
         
         try:
             from google.cloud import storage
-            storage_client = storage.Client()
+            storage_client = get_gcs_client()
             bucket = storage_client.bucket(st.session_state.v5_gcs_bucket)
             blobs = list(bucket.list_blobs(max_results=10))
             mp4_blobs = [b for b in blobs if b.name.endswith(".mp4")]
