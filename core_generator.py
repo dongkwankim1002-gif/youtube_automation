@@ -257,9 +257,11 @@ def wrap_text(text, font, max_width, draw):
 
 def create_subtitle_image(text, width=1080, height=1920, font_size=48, output_path="subtitle.png", position="bottom", font_style="gothic", version="v3.0.0"):
     """Create a transparent PNG containing styled Korean subtitle text with version-specific premium styling."""
-    if version in ["v4.0.0", "v5.0.0"]:
-        # Modern documentary subtitles are smaller, cleaner, and less intrusive
-        font_size = int(font_size * 0.72)
+    # Scale down subtitles across all versions for better visual balance
+    if version in ["v4.0.0", "v5.0.0", "v6.0.0"]:
+        font_size = int(font_size * 0.65)  # Slightly smaller (65% of original) for elegance
+    else:
+        font_size = int(font_size * 0.75)  # Scale down legacy versions slightly to 75%
         
     # Create transparent image
     image = Image.new("RGBA", (width, height), (0, 0, 0, 0))
@@ -302,15 +304,22 @@ def create_subtitle_image(text, width=1080, height=1920, font_size=48, output_pa
         x = (width - line_w) // 2
         
         # Draw background shadow rectangle or modern glowing pill badge
-        padding = 12 if version in ["v4.0.0", "v5.0.0"] else 15
+        padding = 12 if version in ["v4.0.0", "v5.0.0", "v6.0.0"] else 15
         rect_x0 = x - padding
         rect_y0 = current_y - padding
         rect_x1 = x + line_w + padding
         rect_y1 = current_y + line_h + padding
         
-        if version in ["v4.0.0", "v5.0.0"]:
-            bg_color = (15, 12, 12, 110) if version == "v4.0.0" else (10, 15, 20, 115)
-            border_color = (255, 215, 0, 160) if version == "v4.0.0" else (0, 229, 255, 160)
+        if version in ["v4.0.0", "v5.0.0", "v6.0.0"]:
+            if version == "v4.0.0":
+                bg_color = (15, 12, 12, 110)
+                border_color = (255, 215, 0, 160)
+            elif version == "v5.0.0":
+                bg_color = (10, 15, 20, 115)
+                border_color = (0, 229, 255, 160)
+            else:  # v6.0.0
+                bg_color = (12, 10, 15, 120)
+                border_color = (255, 110, 110, 170)  # Coral red border matching theme
             # Rounded pill with elegant accent outline
             draw.rounded_rectangle([rect_x0, rect_y0, rect_x1, rect_y1], radius=12, fill=bg_color, outline=border_color, width=1)
         else:
@@ -328,11 +337,14 @@ def create_subtitle_image(text, width=1080, height=1920, font_size=48, output_pa
             elif version == "v5.0.0":
                 # Electric Cyan for Google Native look
                 color = (0, 229, 255, 255) if highlight else (255, 255, 255, 255)
+            elif version == "v6.0.0":
+                # Vivid Yellow for keyword highlight, matching the coral border
+                color = (255, 235, 59, 255) if highlight else (255, 255, 255, 255)
             else:
                 color = (255, 215, 0, 255) if highlight else (255, 255, 255, 255)
             
             # Draw premium drop shadow for high readability on low-opacity backgrounds
-            if version in ["v4.0.0", "v5.0.0"]:
+            if version in ["v4.0.0", "v5.0.0", "v6.0.0"]:
                 draw.text((curr_x + 1, current_y + 1), word, font=font, fill=(0, 0, 0, 200))
                 
             draw.text((curr_x, current_y), word, font=font, fill=color)
