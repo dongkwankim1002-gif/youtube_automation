@@ -388,19 +388,23 @@ def get_progress_callback(placeholder):
                 justify-content: space-between;
                 align-items: center;
                 transition: all 0.3s ease;
+                color: #888899;
             }}
             .render-step.active {{
                 border-left-color: #ff4b4b;
                 background: #2b1f24;
                 box-shadow: 0 0 15px rgba(255, 75, 75, 0.15);
+                color: #ffffff;
             }}
             .render-step.complete {{
                 border-left-color: #00e676;
                 background: #1b261e;
+                color: #ffffff;
             }}
             .step-title {{
-                font-weight: 600;
+                font-weight: 700;
                 font-size: 1.05rem;
+                color: inherit;
             }}
         </style>
         <div class='render-container'>
