@@ -237,6 +237,21 @@ if "v6_duration_seconds" not in st.session_state:
     st.session_state.v6_duration_seconds = 60
 if "v6_scene_count" not in st.session_state:
     st.session_state.v6_scene_count = 10
+if "v6_primary_style" not in st.session_state:
+    st.session_state.v6_primary_style = "시네마틱 실사 영화 🎬"
+if "v6_primary_intensity" not in st.session_state:
+    st.session_state.v6_primary_intensity = 0.8
+if "v6_secondary_styles" not in st.session_state:
+    st.session_state.v6_secondary_styles = []
+if "v6_secondary_intensities" not in st.session_state:
+    st.session_state.v6_secondary_intensities = {
+        "시네마틱 실사 영화 🎬": 0.5,
+        "코믹/웹툰 스타일 🎨": 0.5,
+        "2D 애니메이션 🧸": 0.5,
+        "역사화 유화 🖌️": 0.5,
+        "수채화 판타지 🔮": 0.5,
+        "네온 사이버펑크 🌌": 0.5
+    }
 if "v6_style_preset" not in st.session_state:
     st.session_state.v6_style_preset = ["시네마틱 실사 영화 🎬"]
 elif isinstance(st.session_state.v6_style_preset, str):
@@ -247,31 +262,45 @@ if "v6_custom_style_desc" not in st.session_state:
     st.session_state.v6_custom_style_desc = ""
 if "v6_character_desc" not in st.session_state:
     st.session_state.v6_character_desc = ""
+if "v6_voice_selection" not in st.session_state:
+    st.session_state.v6_voice_selection = "ko-KR-Neural2-A (남성 - 표준)"
 
 
 def compile_v6_style():
-    presets = st.session_state.v6_style_preset
-    if isinstance(presets, str):
-        presets = [presets]
-    strength = st.session_state.v6_style_intensity
     style_parts = []
     
-    for preset in presets:
-        desc = ""
+    def get_style_desc(preset, strength):
         if preset == "시네마틱 실사 영화 🎬":
-            desc = f"cinematic realism movie style, high detailed dramatic lighting (strength: {strength:.1f})"
+            return f"cinematic realism movie style, high detailed dramatic lighting (strength: {strength:.1f})"
         elif preset == "코믹/웹툰 스타일 🎨":
-            desc = f"vibrant comic book webtoon art style, bold outlines (strength: {strength:.1f})"
+            return f"vibrant comic book webtoon art style, bold outlines (strength: {strength:.1f})"
         elif preset == "2D 애니메이션 🧸":
-            desc = f"modern digital 2D anime animation style, studio ghibli aesthetic (strength: {strength:.1f})"
+            return f"modern digital 2D anime animation style, studio ghibli aesthetic (strength: {strength:.1f})"
         elif preset == "역사화 유화 🖌️":
-            desc = f"fine art oil painting canvas texture, classical historical painting (strength: {strength:.1f})"
+            return f"fine art oil painting canvas texture, classical historical painting (strength: {strength:.1f})"
         elif preset == "수채화 판타지 🔮":
-            desc = f"soft watercolor dreamlike fantasy illustration, magical atmosphere (strength: {strength:.1f})"
+            return f"soft watercolor dreamlike fantasy illustration, magical atmosphere (strength: {strength:.1f})"
         elif preset == "네온 사이버펑크 🌌":
-            desc = f"cyberpunk city night scene, neon glowing lights, volumetric mist (strength: {strength:.1f})"
-        if desc:
-            style_parts.append(desc)
+            return f"cyberpunk city night scene, neon glowing lights, volumetric mist (strength: {strength:.1f})"
+        return ""
+
+    # 1. Primary style
+    primary = st.session_state.v6_primary_style
+    primary_intensity = st.session_state.v6_primary_intensity
+    primary_desc = get_style_desc(primary, primary_intensity)
+    if primary_desc:
+        style_parts.append(primary_desc)
+        
+    # 2. Secondary styles
+    secondaries = st.session_state.v6_secondary_styles
+    for sec in secondaries:
+        if sec == primary:
+            continue
+        sec_intensity = st.session_state.v6_secondary_intensities.get(sec, 0.5)
+        sec_desc = get_style_desc(sec, sec_intensity)
+        if sec_desc:
+            style_parts.append(sec_desc)
+            
     if st.session_state.v6_custom_style_desc.strip():
         style_parts.append(st.session_state.v6_custom_style_desc.strip())
         
@@ -620,7 +649,9 @@ def render_production_flow(version):
             # Set up parameters based on version selection
             if version == "v6.0.0":
                 tts_provider = "google"
-                tts_voice_id = "ko-KR-Neural2-A"
+                voice_raw = st.session_state.v6_voice_selection
+                voice_parts = voice_raw.split(" ")
+                tts_voice_id = voice_parts[0] if len(voice_parts) > 0 else "ko-KR-Neural2-A"
                 image_provider = "google"
                 v5_gcs_bucket = os.getenv("GCS_BUCKET_NAME") or st.session_state.v5_gcs_bucket or "my-video-factory-bucket"
                 v5_video_skin = "Option 2: AI 비디오 직접 생성 (Google Veo)"
@@ -1032,7 +1063,28 @@ if "v6.0.0" in selected_version:
                 )
                 st.session_state.v6_scene_count = selected_scenes
                 
-                st.markdown("#### 🎨 직관적인 다중 화풍 커스터마이저")
+                st.markdown("#### 🎙️ 성우 목소리 설정")
+                v6_voices = [
+                    "ko-KR-Neural2-A (남성 - 표준)", 
+                    "ko-KR-Neural2-B (여성 - 표준)", 
+                    "ko-KR-Wavenet-A (남성 - 중후함)", 
+                    "ko-KR-Journey-F (여성 - 친근함)", 
+                    "ko-KR-Studio-O (남성 - 뉴스 성우)"
+                ]
+                voice_idx = 0
+                for idx, v_opt in enumerate(v6_voices):
+                    if st.session_state.v6_voice_selection in v_opt or v_opt.startswith(st.session_state.v6_voice_selection):
+                        voice_idx = idx
+                        break
+                selected_voice = st.selectbox(
+                    "구글 프리미엄 한국어 성우 보이스 선택",
+                    v6_voices,
+                    index=voice_idx,
+                    key="v6_voice_selection_widget"
+                )
+                st.session_state.v6_voice_selection = selected_voice
+                
+                st.markdown("#### 🎨 직관적인 화풍 커스터마이저")
                 style_presets = [
                     "시네마틱 실사 영화 🎬", 
                     "코믹/웹툰 스타일 🎨", 
@@ -1041,31 +1093,57 @@ if "v6.0.0" in selected_version:
                     "수채화 판타지 🔮", 
                     "네온 사이버펑크 🌌"
                 ]
-                # Safely parse current preset selection as a list
-                current_default = st.session_state.v6_style_preset
-                if isinstance(current_default, str):
-                    current_default = [current_default]
-                current_default = [p for p in current_default if p in style_presets]
-                if not current_default:
-                    current_default = ["시네마틱 실사 영화 🎬"]
-                    
-                selected_presets = st.multiselect(
-                    "적용할 화풍 스타일들을 선택하세요 (복수 선택 가능):",
-                    style_presets,
-                    default=current_default,
-                    key="v6_preset_widget"
-                )
-                st.session_state.v6_style_preset = selected_presets
                 
-                intensity_val = st.slider(
-                    "화풍 스타일 반영 강도 (Intensity)",
+                # 1. Representative Style (대표 화풍) - Single selection
+                selected_primary = st.selectbox(
+                    "적용할 대표 화풍 스타일을 선택하세요 (단일 선택):",
+                    style_presets,
+                    index=style_presets.index(st.session_state.v6_primary_style) if st.session_state.v6_primary_style in style_presets else 0,
+                    key="v6_primary_style_widget"
+                )
+                st.session_state.v6_primary_style = selected_primary
+                
+                # 2. Representative Style Intensity Slider
+                primary_intensity = st.slider(
+                    f"대표 화풍 ({selected_primary}) 반영 강도 (Intensity)",
                     min_value=0.0,
                     max_value=1.0,
-                    value=st.session_state.v6_style_intensity,
+                    value=st.session_state.v6_primary_intensity,
                     step=0.1,
-                    key="v6_intensity_widget"
+                    key="v6_primary_intensity_widget"
                 )
-                st.session_state.v6_style_intensity = intensity_val
+                st.session_state.v6_primary_intensity = primary_intensity
+                
+                # 3. Secondary Style (보조 화풍) - Multiple selection (excluding representative style)
+                secondary_options = [p for p in style_presets if p != selected_primary]
+                current_secondaries = [p for p in st.session_state.v6_secondary_styles if p in secondary_options]
+                
+                selected_secondaries = st.multiselect(
+                    "적용할 보조 화풍 스타일들을 선택하세요 (복수 선택 가능):",
+                    secondary_options,
+                    default=current_secondaries,
+                    key="v6_secondary_styles_widget"
+                )
+                st.session_state.v6_secondary_styles = selected_secondaries
+                
+                # Update backward compatible style list
+                st.session_state.v6_style_preset = [selected_primary] + selected_secondaries
+                
+                # 4. Individual sliders for secondary styles
+                if selected_secondaries:
+                    st.markdown("##### 🎨 보조 화풍별 개별 반영 강도 설정")
+                    for sec in selected_secondaries:
+                        if sec not in st.session_state.v6_secondary_intensities:
+                            st.session_state.v6_secondary_intensities[sec] = 0.5
+                        val = st.slider(
+                            f"보조 화풍 ({sec}) 반영 강도 (Intensity)",
+                            min_value=0.0,
+                            max_value=1.0,
+                            value=st.session_state.v6_secondary_intensities[sec],
+                            step=0.1,
+                            key=f"v6_sec_intensity_{sec}"
+                        )
+                        st.session_state.v6_secondary_intensities[sec] = val
                 
                 custom_style_val = st.text_input(
                     "추가 커스텀 화풍 설명 (영문, 선택사항):",
