@@ -234,9 +234,11 @@ if "v5_custom_style_desc" not in st.session_state:
 
 # v6.0.0 Specific state parameters (Omni-Veo Multimodal)
 if "v6_duration_seconds" not in st.session_state:
-    st.session_state.v6_duration_seconds = 60
+    st.session_state.v6_duration_seconds = 20
+elif st.session_state.v6_duration_seconds > 30:
+    st.session_state.v6_duration_seconds = 30
 if "v6_scene_count" not in st.session_state:
-    st.session_state.v6_scene_count = 10
+    st.session_state.v6_scene_count = 3
 if "v6_primary_style" not in st.session_state:
     st.session_state.v6_primary_style = "시네마틱 실사 영화 🎬"
 if "v6_primary_intensity" not in st.session_state:
@@ -1071,9 +1073,9 @@ if "v6.0.0" in selected_version:
                 
                 # Dynamic Linkage: Duration & Recommended Scene Count
                 duration_val = st.slider(
-                    "영상 총 길이 설정 (초 단위, 최대 3분)",
+                    "영상 총 길이 설정 (초 단위, 최대 30초)",
                     min_value=10,
-                    max_value=180,
+                    max_value=30,
                     value=st.session_state.v6_duration_seconds,
                     step=5,
                     key="v6_duration_slider"
@@ -1084,13 +1086,21 @@ if "v6.0.0" in selected_version:
                 min_scenes = max(2, int(duration_val // 8))
                 max_scenes = max(4, int(duration_val // 5))
                 
+                # Dynamic reset logic to lock default scene count to average of recommended range
+                if "v6_last_duration" not in st.session_state:
+                    st.session_state.v6_last_duration = duration_val
+                
+                if st.session_state.v6_last_duration != duration_val:
+                    st.session_state.v6_last_duration = duration_val
+                    st.session_state.v6_scene_count = (min_scenes + max_scenes) // 2
+                
                 st.info(f"💡 설정한 영상 길이 **{duration_val}초** 대비 **권장 씬 범위: {min_scenes}개 ~ {max_scenes}개** 입니다. (씬당 약 5~8초 소요)")
                 
                 selected_scenes = st.slider(
                     "대본 생성 씬 개수 선택",
                     min_value=2,
-                    max_value=max(30, max_scenes),
-                    value=min(st.session_state.v6_scene_count, max(30, max_scenes)),
+                    max_value=max(15, max_scenes),
+                    value=int(st.session_state.v6_scene_count),
                     step=1,
                     key="v6_scenes_slider"
                 )
