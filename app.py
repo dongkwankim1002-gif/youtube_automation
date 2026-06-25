@@ -238,7 +238,9 @@ if "v6_duration_seconds" not in st.session_state:
 if "v6_scene_count" not in st.session_state:
     st.session_state.v6_scene_count = 10
 if "v6_style_preset" not in st.session_state:
-    st.session_state.v6_style_preset = "시네마틱 실사 영화 🎬"
+    st.session_state.v6_style_preset = ["시네마틱 실사 영화 🎬"]
+elif isinstance(st.session_state.v6_style_preset, str):
+    st.session_state.v6_style_preset = [st.session_state.v6_style_preset]
 if "v6_style_intensity" not in st.session_state:
     st.session_state.v6_style_intensity = 0.8
 if "v6_custom_style_desc" not in st.session_state:
@@ -248,23 +250,28 @@ if "v6_character_desc" not in st.session_state:
 
 
 def compile_v6_style():
-    preset = st.session_state.v6_style_preset
+    presets = st.session_state.v6_style_preset
+    if isinstance(presets, str):
+        presets = [presets]
     strength = st.session_state.v6_style_intensity
-    desc = ""
-    if preset == "시네마틱 실사 영화 🎬":
-        desc = f"cinematic realism movie style, high detailed dramatic lighting (strength: {strength:.1f})"
-    elif preset == "코믹/웹툰 스타일 🎨":
-        desc = f"vibrant comic book webtoon art style, bold outlines (strength: {strength:.1f})"
-    elif preset == "2D 애니메이션 🧸":
-        desc = f"modern digital 2D anime animation style, studio ghibli aesthetic (strength: {strength:.1f})"
-    elif preset == "역사화 유화 🖌️":
-        desc = f"fine art oil painting canvas texture, classical historical painting (strength: {strength:.1f})"
-    elif preset == "수채화 판타지 🔮":
-        desc = f"soft watercolor dreamlike fantasy illustration, magical atmosphere (strength: {strength:.1f})"
-    elif preset == "네온 사이버펑크 🌌":
-        desc = f"cyberpunk city night scene, neon glowing lights, volumetric mist (strength: {strength:.1f})"
+    style_parts = []
     
-    style_parts = [desc] if desc else []
+    for preset in presets:
+        desc = ""
+        if preset == "시네마틱 실사 영화 🎬":
+            desc = f"cinematic realism movie style, high detailed dramatic lighting (strength: {strength:.1f})"
+        elif preset == "코믹/웹툰 스타일 🎨":
+            desc = f"vibrant comic book webtoon art style, bold outlines (strength: {strength:.1f})"
+        elif preset == "2D 애니메이션 🧸":
+            desc = f"modern digital 2D anime animation style, studio ghibli aesthetic (strength: {strength:.1f})"
+        elif preset == "역사화 유화 🖌️":
+            desc = f"fine art oil painting canvas texture, classical historical painting (strength: {strength:.1f})"
+        elif preset == "수채화 판타지 🔮":
+            desc = f"soft watercolor dreamlike fantasy illustration, magical atmosphere (strength: {strength:.1f})"
+        elif preset == "네온 사이버펑크 🌌":
+            desc = f"cyberpunk city night scene, neon glowing lights, volumetric mist (strength: {strength:.1f})"
+        if desc:
+            style_parts.append(desc)
     if st.session_state.v6_custom_style_desc.strip():
         style_parts.append(st.session_state.v6_custom_style_desc.strip())
         
@@ -1025,7 +1032,7 @@ if "v6.0.0" in selected_version:
                 )
                 st.session_state.v6_scene_count = selected_scenes
                 
-                st.markdown("#### 🎨 직관적인 단일 화풍 커스터마이저")
+                st.markdown("#### 🎨 직관적인 다중 화풍 커스터마이저")
                 style_presets = [
                     "시네마틱 실사 영화 🎬", 
                     "코믹/웹툰 스타일 🎨", 
@@ -1034,13 +1041,21 @@ if "v6.0.0" in selected_version:
                     "수채화 판타지 🔮", 
                     "네온 사이버펑크 🌌"
                 ]
-                selected_preset = st.selectbox(
-                    "적용할 대표 화풍 스타일을 선택하세요:",
+                # Safely parse current preset selection as a list
+                current_default = st.session_state.v6_style_preset
+                if isinstance(current_default, str):
+                    current_default = [current_default]
+                current_default = [p for p in current_default if p in style_presets]
+                if not current_default:
+                    current_default = ["시네마틱 실사 영화 🎬"]
+                    
+                selected_presets = st.multiselect(
+                    "적용할 화풍 스타일들을 선택하세요 (복수 선택 가능):",
                     style_presets,
-                    index=style_presets.index(st.session_state.v6_style_preset),
+                    default=current_default,
                     key="v6_preset_widget"
                 )
-                st.session_state.v6_style_preset = selected_preset
+                st.session_state.v6_style_preset = selected_presets
                 
                 intensity_val = st.slider(
                     "화풍 스타일 반영 강도 (Intensity)",
