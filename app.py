@@ -1092,7 +1092,7 @@ if "v6.0.0" in selected_version:
                 
                 if st.session_state.v6_last_duration != duration_val:
                     st.session_state.v6_last_duration = duration_val
-                    st.session_state.v6_scene_count = (min_scenes + max_scenes) // 2
+                    st.session_state.v6_scene_count = max(2, int(round(duration_val / 7.0)))
                 
                 st.info(f"💡 설정한 영상 길이 **{duration_val}초** 대비 **권장 씬 범위: {min_scenes}개 ~ {max_scenes}개** 입니다. (씬당 약 5~8초 소요)")
                 
