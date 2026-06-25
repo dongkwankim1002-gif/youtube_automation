@@ -232,14 +232,15 @@ def wrap_text(text, font, max_width, draw):
     
     for word in words:
         current_line.append(word)
-        # Calculate width of current line
+        # Calculate width of current line (clean double asterisks for exact length)
         line_text = " ".join(current_line)
+        line_text_clean = line_text.replace("**", "")
         # Compatibility check for Pillow versions
         if hasattr(draw, "textbbox"):
-            bbox = draw.textbbox((0, 0), line_text, font=font)
+            bbox = draw.textbbox((0, 0), line_text_clean, font=font)
             width = bbox[2] - bbox[0]
         else:
-            width, _ = draw.textsize(line_text, font=font)
+            width, _ = draw.textsize(line_text_clean, font=font)
             
         if width > max_width:
             if len(current_line) > 1:
@@ -258,7 +259,9 @@ def wrap_text(text, font, max_width, draw):
 def create_subtitle_image(text, width=1080, height=1920, font_size=48, output_path="subtitle.png", position="bottom", font_style="gothic", version="v3.0.0"):
     """Create a transparent PNG containing styled Korean subtitle text with version-specific premium styling."""
     # Scale down subtitles across all versions for better visual balance
-    if version in ["v4.0.0", "v5.0.0", "v6.0.0"]:
+    if version == "v6.0.0":
+        font_size = int(font_size * 0.70)  # User requested exactly 70% size
+    elif version in ["v4.0.0", "v5.0.0"]:
         font_size = int(font_size * 0.65)  # Slightly smaller (65% of original) for elegance
     else:
         font_size = int(font_size * 0.75)  # Scale down legacy versions slightly to 75%
@@ -276,11 +279,12 @@ def create_subtitle_image(text, width=1080, height=1920, font_size=48, output_pa
     # Calculate text height for vertical placement
     line_heights = []
     for line in lines:
+        line_clean = line.replace("**", "")
         if hasattr(draw, "textbbox"):
-            bbox = draw.textbbox((0, 0), line, font=font)
+            bbox = draw.textbbox((0, 0), line_clean, font=font)
             line_heights.append(bbox[3] - bbox[1])
         else:
-            _, h = draw.textsize(line, font=font)
+            _, h = draw.textsize(line_clean, font=font)
             line_heights.append(h)
             
     total_text_height = sum(line_heights) + (15 * (len(lines) - 1))  # 15px line spacing
@@ -293,13 +297,14 @@ def create_subtitle_image(text, width=1080, height=1920, font_size=48, output_pa
     
     current_y = start_y
     for i, line in enumerate(lines):
-        # Calculate x to center text
+        # Calculate x to center text using clean line width
+        line_clean = line.replace("**", "")
         if hasattr(draw, "textbbox"):
-            bbox = draw.textbbox((0, 0), line, font=font)
+            bbox = draw.textbbox((0, 0), line_clean, font=font)
             line_w = bbox[2] - bbox[0]
             line_h = bbox[3] - bbox[1]
         else:
-            line_w, line_h = draw.textsize(line, font=font)
+            line_w, line_h = draw.textsize(line_clean, font=font)
             
         x = (width - line_w) // 2
         
@@ -329,7 +334,14 @@ def create_subtitle_image(text, width=1080, height=1920, font_size=48, output_pa
         words_in_line = line.split(" ")
         curr_x = x
         for word in words_in_line:
-            highlight = is_keyword_word(word)
+            # Parse double asterisk highlighting
+            highlight_by_stars = False
+            clean_word = word
+            if "**" in word:
+                highlight_by_stars = True
+                clean_word = word.replace("**", "")
+                
+            highlight = highlight_by_stars or is_keyword_word(clean_word)
             
             # Determine color scheme based on version
             if version == "v4.0.0":
@@ -345,18 +357,18 @@ def create_subtitle_image(text, width=1080, height=1920, font_size=48, output_pa
             
             # Draw premium drop shadow for high readability on low-opacity backgrounds
             if version in ["v4.0.0", "v5.0.0", "v6.0.0"]:
-                draw.text((curr_x + 1, current_y + 1), word, font=font, fill=(0, 0, 0, 200))
+                draw.text((curr_x + 1, current_y + 1), clean_word, font=font, fill=(0, 0, 0, 200))
                 
-            draw.text((curr_x, current_y), word, font=font, fill=color)
+            draw.text((curr_x, current_y), clean_word, font=font, fill=color)
             
-            # Measure word and trailing space to update horizontal offset
+            # Measure clean word and trailing space to update horizontal offset
             if hasattr(draw, "textbbox"):
-                word_bbox = draw.textbbox((0, 0), word, font=font)
+                word_bbox = draw.textbbox((0, 0), clean_word, font=font)
                 word_w = word_bbox[2] - word_bbox[0]
                 space_bbox = draw.textbbox((0, 0), " ", font=font)
                 space_w = space_bbox[2] - space_bbox[0]
             else:
-                word_w, _ = draw.textsize(word, font=font)
+                word_w, _ = draw.textsize(clean_word, font=font)
                 space_w, _ = draw.textsize(" ", font=font)
                 
             curr_x += word_w + space_w
@@ -535,6 +547,11 @@ def generate_google_tts(text, output_path, voice_name="ko-KR-Neural2-A", api_key
 def generate_voice_over(text, output_path, provider="edge", voice_id=None, api_key=None, rate="-12%",
                         v4_voice_stability=0.75, v4_voice_clarity=0.75, v4_voice_style=0.0):
     """Synthesize speech with selected provider and fallback to edge-tts if it fails."""
+    import re
+    # Clean text to strip double asterisks so they aren't spoken by TTS
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+    text = text.replace("*", "") # Just in case single asterisks exist
+    
     if provider == "google":
         try:
             print(f"[TTS] Attempting Google Cloud TTS with voice {voice_id}...")
@@ -628,6 +645,7 @@ def generate_script_from_gemini(topic, is_shorts=True, character_desc="", visual
     2. 전개 (중간 Scene들): 인물들의 생존의 사투, 역사적 발견 과정, 또는 자연적 인과관계를 영화적인 긴장감을 가지고 시간순 혹은 논리적 구조로 추적하십시오.
     3. 아웃트로 (마지막 Scene): 단순 요약이 아닌, 역사적 혹은 인문학적 깊이를 지닌 철학적 성찰과 여운을 남기는 여운으로 장엄하게 마무리하십시오.
     4. 대본 분량 제어: 느린 발화 속도(-12% 감속)에 어울리도록, 각 씬의 나레이션(narration) 문장은 너무 길지 않고 정돈된 2~3문장 이내(쇼츠 기준 공백 포함 60~80자 내외, 일반 영상 기준 120~150자 내외)로 끊어 주십시오.
+    5. 중요한 단어 강조: 나레이션(narration) 중에서 주제의 핵심 키워드, 역사적 사건명, 숫자, 인명, 지명 등 가장 중요하게 강조하고 싶은 대표 단어(씬당 2~4개 단어)는 반드시 단어 양옆에 `**`를 붙여 강조해 주십시오 (예: "이 의문의 시작은 바로 **1901년**이었습니다. 한 오스트리아 의사가 **적혈구 항원**을 발견한 것입니다.").
 
     반드시 아래 JSON 형식으로만 응답하세요. 다른 설명이나 텍스트는 일체 생략하고 순수 JSON 데이터만 반환해야 합니다.
 
