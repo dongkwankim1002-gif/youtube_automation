@@ -1071,6 +1071,12 @@ if "v6.0.0" in selected_version:
                 st.markdown("#### ⏱️ 영상 재생 시간 및 씬 개수 연동 설정")
                 st.markdown("비주얼 및 대본 연출 로직의 충돌을 방지하기 위해, 영상 시간과 씬 개수를 사전에 확정하여 대본을 생성합니다.")
                 
+                def update_v6_scenes():
+                    new_dur = st.session_state.v6_duration_slider
+                    new_scenes = max(2, int(round(new_dur / 7.0)))
+                    st.session_state.v6_scene_count = new_scenes
+                    st.session_state.v6_scenes_slider = new_scenes
+
                 # Dynamic Linkage: Duration & Recommended Scene Count
                 duration_val = st.slider(
                     "영상 총 길이 설정 (초 단위, 최대 30초)",
@@ -1078,21 +1084,14 @@ if "v6.0.0" in selected_version:
                     max_value=30,
                     value=st.session_state.v6_duration_seconds,
                     step=5,
-                    key="v6_duration_slider"
+                    key="v6_duration_slider",
+                    on_change=update_v6_scenes
                 )
                 st.session_state.v6_duration_seconds = duration_val
                 
                 # Calculate recommended scene range
                 min_scenes = max(2, int(duration_val // 8))
                 max_scenes = max(4, int(duration_val // 5))
-                
-                # Dynamic reset logic to lock default scene count to average of recommended range
-                if "v6_last_duration" not in st.session_state:
-                    st.session_state.v6_last_duration = duration_val
-                
-                if st.session_state.v6_last_duration != duration_val:
-                    st.session_state.v6_last_duration = duration_val
-                    st.session_state.v6_scene_count = max(2, int(round(duration_val / 7.0)))
                 
                 st.info(f"💡 설정한 영상 길이 **{duration_val}초** 대비 **권장 씬 범위: {min_scenes}개 ~ {max_scenes}개** 입니다. (씬당 약 5~8초 소요)")
                 
