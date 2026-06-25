@@ -1069,7 +1069,6 @@ if "v6.0.0" in selected_version:
                 st.session_state.v6_character_desc = character_input
                 
                 st.markdown("#### ⏱️ 영상 재생 시간 및 씬 개수 연동 설정")
-                st.markdown("비주얼 및 대본 연출 로직의 충돌을 방지하기 위해, 영상 시간과 씬 개수를 사전에 확정하여 대본을 생성합니다.")
                 
                 def update_v6_scenes():
                     new_dur = st.session_state.v6_duration_slider
