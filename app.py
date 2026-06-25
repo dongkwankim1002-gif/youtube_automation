@@ -303,8 +303,31 @@ def compile_v6_style():
         if sec_desc:
             style_parts.append(sec_desc)
             
-    if st.session_state.v6_custom_style_desc.strip():
-        style_parts.append(st.session_state.v6_custom_style_desc.strip())
+    custom_desc = st.session_state.v6_custom_style_desc.strip()
+    if custom_desc:
+        import re
+        if re.search('[가-힣]', custom_desc):
+            active_gemini_key = st.session_state.api_gemini if st.session_state.api_gemini else gemini_key
+            if active_gemini_key:
+                try:
+                    from google import genai
+                    client = genai.Client(api_key=active_gemini_key)
+                    prompt = f"Translate the following Korean description of an image/video style or aesthetic into English. Return only the translated English text, nothing else:\n{custom_desc}"
+                    response = client.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=prompt
+                    )
+                    translated = response.text.strip()
+                    if translated:
+                        style_parts.append(translated)
+                    else:
+                        style_parts.append(custom_desc)
+                except Exception as e:
+                    style_parts.append(custom_desc)
+            else:
+                style_parts.append(custom_desc)
+        else:
+            style_parts.append(custom_desc)
         
     compiled = ", ".join(style_parts)
     if not compiled:
@@ -1171,9 +1194,9 @@ if "v6.0.0" in selected_version:
                         st.session_state.v6_secondary_intensities[sec] = val
                 
                 custom_style_val = st.text_input(
-                    "추가 커스텀 화풍 설명 (영문, 선택사항):",
+                    "추가 커스텀 화풍 설명 (한글 또는 영문, 선택사항):",
                     value=st.session_state.v6_custom_style_desc,
-                    placeholder="예: volumetric light, 8k resolution, photorealistic",
+                    placeholder="예: volumetric light, 8k resolution 또는 웅장하고 입체적인 조명, 8k 해상도",
                     key="v6_custom_desc_widget"
                 )
                 st.session_state.v6_custom_style_desc = custom_style_val
