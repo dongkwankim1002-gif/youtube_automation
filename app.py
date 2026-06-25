@@ -264,6 +264,8 @@ if "v6_character_desc" not in st.session_state:
     st.session_state.v6_character_desc = ""
 if "v6_voice_selection" not in st.session_state:
     st.session_state.v6_voice_selection = "ko-KR-Neural2-A (남성 - 표준)"
+if "v6_aspect_ratio" not in st.session_state:
+    st.session_state.v6_aspect_ratio = "9:16 (쇼츠 세로형)"
 
 
 def compile_v6_style():
@@ -655,8 +657,16 @@ def render_production_flow(version):
                 image_provider = "google"
                 v5_gcs_bucket = os.getenv("GCS_BUCKET_NAME") or st.session_state.v5_gcs_bucket or "my-video-factory-bucket"
                 v5_video_skin = "Option 2: AI 비디오 직접 생성 (Google Veo)"
-                st.session_state.is_shorts = True
-                st.session_state.target_size = (540, 960)
+                # Dynamically set is_shorts and target_size based on selected aspect ratio for v6.0.0
+                if "9:16" in st.session_state.v6_aspect_ratio:
+                    st.session_state.is_shorts = True
+                    st.session_state.target_size = (540, 960)
+                elif "16:9" in st.session_state.v6_aspect_ratio:
+                    st.session_state.is_shorts = False
+                    st.session_state.target_size = (960, 540)
+                else: # 1:1
+                    st.session_state.is_shorts = False
+                    st.session_state.target_size = (640, 640)
                 
             elif version == "v4.0.0":
                 v4_easing = st.session_state.v4_easing
@@ -1062,6 +1072,21 @@ if "v6.0.0" in selected_version:
                     key="v6_scenes_slider"
                 )
                 st.session_state.v6_scene_count = selected_scenes
+                
+                st.markdown("#### 📐 비디오 화면 비율 설정")
+                v6_aspects = ["9:16 (쇼츠 세로형)", "16:9 (일반 가로형)", "1:1 (정사각형)"]
+                aspect_idx = 0
+                for idx, a_opt in enumerate(v6_aspects):
+                    if st.session_state.v6_aspect_ratio in a_opt:
+                        aspect_idx = idx
+                        break
+                selected_aspect = st.selectbox(
+                    "비주얼 종횡비 (Aspect Ratio) 선택",
+                    v6_aspects,
+                    index=aspect_idx,
+                    key="v6_aspect_ratio_widget"
+                )
+                st.session_state.v6_aspect_ratio = selected_aspect
                 
                 st.markdown("#### 🎙️ 성우 목소리 설정")
                 v6_voices = [
