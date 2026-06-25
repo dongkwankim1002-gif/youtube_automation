@@ -409,12 +409,9 @@ def generate_elevenlabs_tts(text, output_path, voice_id="pNInz6obpgq5mWzIA5FD", 
 
 def generate_google_tts(text, output_path, voice_name="ko-KR-Neural2-A", api_key=None, rate="-12%"):
     """Synthesize speech using Google Cloud Text-to-Speech REST API."""
-    k = api_key or os.getenv("GEMINI_API_KEY")
-    if not k:
-        raise ValueError("Google API key is missing for TTS.")
-        
-    url = f"https://texttospeech.googleapis.com/v1/text:synthesize?key={k}"
-    headers = {"Content-Type": "application/json"}
+    import json
+    from google.oauth2 import service_account
+    from google.auth.transport.requests import Request
     
     # Map friendly names to actual API voice codes
     voice_map = {
@@ -428,6 +425,64 @@ def generate_google_tts(text, output_path, voice_name="ko-KR-Neural2-A", api_key
     actual_voice = voice_map.get(voice_name, voice_name)
     if not actual_voice:
         actual_voice = "ko-KR-Neural2-A"
+        
+    access_token = None
+    credentials = None
+    
+    # Try GCP_SERVICE_ACCOUNT_JSON env variable (raw JSON string)
+    sa_json = os.getenv("GCP_SERVICE_ACCOUNT_JSON")
+    if sa_json:
+        try:
+            info = json.loads(sa_json)
+            credentials = service_account.Credentials.from_service_account_info(
+                info, scopes=["https://www.googleapis.com/auth/cloud-platform"]
+            )
+            print("[Google TTS] Credentials successfully loaded from GCP_SERVICE_ACCOUNT_JSON env string.")
+        except Exception as e_sa:
+            print(f"[Google TTS Warning] Failed to parse GCP_SERVICE_ACCOUNT_JSON: {e_sa}")
+            
+    # Try GOOGLE_APPLICATION_CREDENTIALS filepath if credentials still not loaded
+    if not credentials:
+        google_app_creds = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+        if google_app_creds and os.path.exists(google_app_creds):
+            try:
+                credentials = service_account.Credentials.from_service_account_file(
+                    google_app_creds, scopes=["https://www.googleapis.com/auth/cloud-platform"]
+                )
+                print(f"[Google TTS] Credentials successfully loaded from file: {google_app_creds}")
+            except Exception as e_file:
+                print(f"[Google TTS Warning] Failed to load credentials from file {google_app_creds}: {e_file}")
+                
+    # Fallback to google.auth.default() if credentials still not loaded
+    if not credentials:
+        try:
+            import google.auth
+            credentials, project = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+            print("[Google TTS] Credentials successfully loaded from google.auth.default().")
+        except Exception as e_auth:
+            print(f"[Google TTS Warning] Failed to load default credentials: {e_auth}")
+            
+    # Refresh credentials to get OAuth token
+    if credentials:
+        try:
+            credentials.refresh(Request())
+            access_token = credentials.token
+        except Exception as e_refresh:
+            print(f"[Google TTS Warning] Failed to refresh credentials for token: {e_refresh}")
+            
+    # Setup headers and URL
+    if access_token:
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {access_token}"
+        }
+        url = "https://texttospeech.googleapis.com/v1/text:synthesize"
+    else:
+        k = api_key or os.getenv("GEMINI_API_KEY")
+        if not k:
+            raise ValueError("No valid GCP credentials or API key found for Google TTS.")
+        url = f"https://texttospeech.googleapis.com/v1/text:synthesize?key={k}"
+        headers = {"Content-Type": "application/json"}
         
     # Determine language code
     lang_code = "ko-KR"
@@ -501,9 +556,17 @@ def generate_voice_over(text, output_path, provider="edge", voice_id=None, api_k
         except Exception as e:
             print(f"[TTS Warning] ElevenLabs TTS failed: {e}. Falling back to Microsoft Edge TTS...")
             
-    # Default to Edge-TTS (only allow valid Edge-TTS voice names)
+    # Default/Fallback to Edge-TTS (only allow valid Edge-TTS voice names)
     valid_edge_voices = ["ko-KR-InJoonNeural", "ko-KR-SunHiNeural", "ko-KR-HyunminNeural"]
-    edge_voice = voice_id if voice_id in valid_edge_voices else "ko-KR-InJoonNeural"
+    if voice_id in valid_edge_voices:
+        edge_voice = voice_id
+    else:
+        # Determine fallback voice gender based on keyword matching
+        v_id_lower = str(voice_id).lower() if voice_id else ""
+        female_keywords = ["neural2-b", "journey-f", "sunhi", "female", "여성"]
+        is_female = any(kw in v_id_lower for kw in female_keywords)
+        edge_voice = "ko-KR-SunHiNeural" if is_female else "ko-KR-InJoonNeural"
+        
     generate_tts(text, output_path, voice=edge_voice, rate=rate)
     print(f"[TTS] Microsoft Edge TTS ({edge_voice}) succeeded!")
     return "edge"
